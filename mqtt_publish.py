@@ -14,7 +14,6 @@ import time
 import datetime
 import json
 import logging
-from domoticzpython import pythonz
 from unipipython import unipython
 from statistics import mean, median
 import paho.mqtt.client as mqtt
@@ -22,9 +21,9 @@ import os
 import traceback
 
 # Your MQTT server information
-broker_aconfig_devress="192.168.1.124" 
+broker_address="192.168.1.124" 
 # Your UniPI server information
-unipi_aconfig_devress = str ("127.0.0.1")
+unipi_address = str ("127.0.0.1")
 
 # Some variables and other config items that we might need
 interval = 29 #realtime data sampling interval (for ais that report every second) to reduce updates to bus and rest API 
@@ -36,7 +35,7 @@ def get_function_name():
     return traceback.extract_stack(None, 2)[0][2]
 
 client = mqtt.Client()
-client.connect(broker_aconfig_devress)
+client.connect(broker_address)
 
 #set relative path for loading files
 dirname = os.path.dirname(__file__)
@@ -231,7 +230,7 @@ def on_open(ws):
 	mqtt_online()
 
 def mqtt_online(): #function to bring MQTT devices online to broker
-	client.connect(broker_aconfig_devress)
+	client.connect(broker_address)
 	for config_dev in devices_config:
 		mqtt_topic_online = (config_dev['state_topic'] + "/available")
 		client.publish(mqtt_topic_online, payload='online', qos=0, retain=True)
@@ -253,7 +252,7 @@ if __name__ == "__main__":
 	devices_config = json.load(open(dev_des_file))
 	# open websocket connection 
 	websocket.enableTrace(True)
-	ws = websocket.WebSocketApp("ws://" + unipi_aconfig_devress + "/ws",
+	ws = websocket.WebSocketApp("ws://" + unipi_address + "/ws",
 							  on_message = on_message,
 							  on_error = on_error,
 							  on_close = on_close)
@@ -261,6 +260,3 @@ if __name__ == "__main__":
 	while True:
 		ws.run_forever()	
 	
-	
-
-
