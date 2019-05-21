@@ -1,8 +1,10 @@
 # unipi-mqtt
 
-This is a script that creates MQTT messages based on the events that happen on the UNIPI device. Worked with a Unipi 513 here. Main goal is to get MQTT messages to Home Assistant. I am building a client script too that listens to MQTT and switches UNIPI outputs, stay tuned, 
+This is a script that creates MQTT messages based on the events that happen on the UNIPI device ans switches UniPi outputs based on received MQTT messages. Worked with a Unipi 513 here. Main goal is to get MQTT messages to/from Home Assistant.
 
 Script creates a websocket connection to EVOK and based on those websocket messages and a config file MQTT messages are published. 
+
+Also creates a MQTT listener to listen to incomming MQTT topics and switch UniPi outputs based on those messages. I created the system in such a way that info to switch an output must be in the MQTT message. See the Hass examples below. 
 
 WARNING: I am not a programmer, so this code kinda works, but it ain't pretty ;-) (I think...). So there is a big chance you need to tinker a bit in the scripts. It's also a version 1 that I build specifically for my home assistant setup, so it's quite tailored to my personal need and way of working. 
 
@@ -65,7 +67,7 @@ Example for light (publish from HASS to UniPi to turn on an output)
   qos: 0
 ```
 
-## ToDO
+## ToDo
   - Something with authenticaton
   - Use config file for client part too
   - clean up code more
