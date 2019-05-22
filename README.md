@@ -21,10 +21,41 @@ Prereq:
 Setup:
  - Copy the 3 scripts into a dir
  - Adjust the vars in the script to your needs, like IP, etc.
- - Create a service based on this script (example to do so here; http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/)
- - Start the service and see what happens. 
+ - Adjust the unipi_mqtt_config.json file to refelxt your unipi and the connected devices to it (see below for more details)
+ - optional; Create a service based on this script (example to do so here; http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/)
+ - Start the service or script and see what happens. 
  - Logging goes to /var/log/unipi_mqtt.log
+
+## UniPi unipi_mqtt_config.json
+
+A config file is used to describe to inputs on the UniPi so the script knows what to send out when a change on a input is detected. An example config file is in the repo, here an example entry. It's JSON, so make sure it's valid. 
+
+```json
+   {
+      "circuit":"1_04",
+      "description":"Kantoor PIR",
+      "dev":"input",
+      "device_delay":120,
+      "device_normal":"no",
+      "unipi_value":0,
+      "unipi_prev_value":0,
+      "unipi_prev_value_timstamp":0,
+      "state_topic": "unipi/bgg/kantoor/motion"
+   },
+```
+
+Description of the fields:
+ - dev: The input device type on the UniPi
+ - circuit: The input circuit on the UniPi
+ - description: Description of what you do with this input
+ - device_delay: delay to turn device off automatically (used for PIR sensors that work pulse based)
+ - device_normal: is device normal open or normal closed
+ - unipi_value: what is the current value, used as a "global var"
+ - unipi_prev_value: what is the previous value, used as a "global var"
+ - unipi_prev_value_timstamp: when was the last status change
+ - state_topic: MQTT state topic to send message on
  
+
 ## HASSIO Config
 
 Example for sensor (from UniPi input to HASSIO)
