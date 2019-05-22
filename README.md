@@ -30,6 +30,7 @@ Setup:
 
 A config file is used to describe to inputs on the UniPi so the script knows what to send out when a change on a input is detected. An example config file is in the repo, here an example entry. It's JSON, so make sure it's valid. 
 
+Example PIR sensor for motion detection:
 ```json
    {
       "circuit":"1_04",
@@ -41,6 +42,30 @@ A config file is used to describe to inputs on the UniPi so the script knows wha
       "unipi_prev_value":0,
       "unipi_prev_value_timstamp":0,
       "state_topic": "unipi/bgg/kantoor/motion"
+   },
+```
+
+Example with "handle local" function to handle a local "critical" function within the script.
+
+```json
+   {
+      "circuit":"2_05",
+      "description":"Voordeur Beldrukker",
+      "dev":"input",
+      "handle_local":
+            {
+	            "type": "bel",
+				"trigger":"on",
+				"rings": 3,
+				"output_dev": "output",
+				"output_circuit": "2_01"
+			},
+      "device_delay":1,
+      "device_normal":"no",
+      "unipi_value":0,
+      "unipi_prev_value":0,
+      "unipi_prev_value_timstamp":0,
+      "state_topic": "unipi/bgg/voordeur/beldrukker"
    },
 ```
 
@@ -61,10 +86,16 @@ Description of the fields:
 Example for sensor (from UniPi input to HASSIO)
 ```
 - platform: mqtt
-  state_topic: "unipi/bgg/woonkamer/lux"
-  name: 'Woonkamer Lux'
-  unit_of_measurement: 'lux'
-  value_template: '{{ value_json.lux }}'
+  name: "Kantoor Motion"
+  state_topic: "unipi/bgg/kantoor/motion"
+  payload_on: "ON"
+  payload_off: "OFF"
+  availability_topic: "unipi/bgg/kantoor/motion/available"
+  payload_available: "online"
+  payload_not_available: "offline"
+  qos: 0
+  device_class: presence
+  #retain: true
 ```  
 Example for light (publish from HASS to UniPi to turn on an output)
 ```
