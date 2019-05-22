@@ -134,3 +134,12 @@ Example for light (publish from HASS to UniPi to turn on an output)
   - Use config file for client part too
   - clean up code more
   - many other yet to discover things.
+
+### Test info
+
+Tested on a UniPi 513 with Evok 2.x and Home Assistant 0.93
+Used:
+ - 0-10v inputs and outputs
+ - relay outputs
+ - Digital inputs and outputs
+ - 1 wire for temp, humidity and light
