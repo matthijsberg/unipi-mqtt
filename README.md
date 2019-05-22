@@ -1,4 +1,4 @@
-# unipi-mqtt
+# UniPi MQTT
 
 This is a script that creates MQTT messages based on the events that happen on the UNIPI device ans switches UniPi outputs based on received MQTT messages. Worked with a Unipi 513 here. Main goal is to get MQTT messages to/from Home Assistant.
 
@@ -79,6 +79,7 @@ Description of the fields:
  - unipi_prev_value: what is the previous value, used as a "global var"
  - unipi_prev_value_timstamp: when was the last status change
  - state_topic: MQTT state topic to send message on
+ - handle_local: Use to switch outputs based on a input directly. So no dependency on MQTT broker or HASSIO. Use this for bel and light switches. Does send a MQTT update message to status can change in Home Assistant.
  
 
 ## HASSIO Config
