@@ -76,8 +76,8 @@ Description of the fields:
  - device_delay: delay to turn device off automatically (used for PIR sensors that work pulse based)
  - device_normal: is device normal open or normal closed
  - unipi_value: what is the current value, used as a "global var"
- - unipi_prev_value: what is the previous value, used as a "global var"
- - unipi_prev_value_timstamp: when was the last status change
+ - unipi_prev_value: what is the previous value, used as a "global var" to calculate average of multiple values ver time
+ - unipi_prev_value_timstamp: when was the last status change. Used for delay based off messages, for exmpl. for PIR pulse
  - state_topic: MQTT state topic to send message on
  - handle_local: Use to switch outputs based on a input directly. So no dependency on MQTT broker or HASSIO. Use this for bel and light switches. Does send a MQTT update message to status can change in Home Assistant.
  
