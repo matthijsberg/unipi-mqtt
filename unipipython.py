@@ -83,7 +83,7 @@ class unipython(object):
 		if(r.status_code == 200):
 			return(r.json())
 		else:
-			return('ERROR: statuscode: ' + r.status_code)
+			return(r.status_code)
 
 	# Toggle a device (when on, off, etc.)
 	def toggle_switch(self, dev, circuit): #source_dev is switch, dev / circuit is to be switched
