@@ -139,6 +139,7 @@ Initial release and documentation in this readme file
 Changes:
  - Changed handling if DI devices with delay to no longer use previous state for rest of devices, cleaned up json config file. Should fix a bug that crashed the script on certain ON / OFF actions.
  - Implemented a "frist run" part to set MQTT messages at script start to reflect actual status of inputs, not last known status maintained in MQTT broker or no status at al. 
+ - tested UART (extension module) and that works. Changed config file with example
 
 ## ToDo
   - Something with authenticaton
@@ -148,11 +149,11 @@ Changes:
 
 # Test info
 
-Tested on a UniPi 513 with Evok 2.x and Home Assistant 0.93
+Tested on a UniPi 513 with Extensio xS30 running Evok 2.x and Home Assistant 0.93
 Used:
  - 0-10v inputs and outputs
  - relay outputs
  - Digital inputs and outputs
  - 1 wire for temp, humidity and light
- - tested UART (extension module) and that works. Changed config file with example
+ - UART Extention module 30
 
