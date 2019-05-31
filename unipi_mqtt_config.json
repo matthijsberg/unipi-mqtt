@@ -26,6 +26,20 @@
       "state_topic": "unipi/bgg/achterdeur/beldrukker"
    },
    {
+      "circuit":"UART_2_4_01",
+      "description":"TEST extension module",
+      "dev":"input",
+      "handle_local":
+            {
+	            "type": "dimmer",
+	            "output_dev": "analogoutput",
+				"output_circuit": "2_01",
+				"level": "10"
+			},
+      "device_normal":"no",
+      "state_topic": "unipi/bgg/achterdeur/lichtschakelaar"
+   },
+   {
       "circuit":"2_03",
       "description":"Achterdeur Contact",
       "dev":"input",
