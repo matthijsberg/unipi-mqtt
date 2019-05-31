@@ -130,6 +130,16 @@ Example for light (publish from HASS to UniPi to turn on an output)
   qos: 0
 ```
 
+# Change log
+
+## Version 0.1
+Initial release and documentation in this readme file
+
+## Version 0.2
+Changes:
+ - Changed handling if DI devices with delay to no longer use previous state for rest of devices, cleaned up json config file. Should fix a bug that crashed the script on certain ON / OFF actions.
+ - Implemented a "frist run" part to set MQTT messages at script start to reflect actual status of inputs, not last known status maintained in MQTT broker or no status at al. 
+
 ## ToDo
   - Something with authenticaton
   - Use config file for client part too
@@ -144,3 +154,5 @@ Used:
  - relay outputs
  - Digital inputs and outputs
  - 1 wire for temp, humidity and light
+ - tested UART (extension module) and that works. Changed config file with example
+
