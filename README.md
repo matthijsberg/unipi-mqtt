@@ -19,6 +19,7 @@ Prereq:
  - MQTT Broker somewhere
  
 Setup:
+ - make sure you have all the required packes (python 3 and "pip3 install paho-mqtt threaded websocket-client statistics")
  - Copy the 3 scripts into a dir
  - Adjust the vars in the script to your needs, like IP, etc.
  - Adjust the unipi_mqtt_config.json file to refelxt your unipi and the connected devices to it (see below for more details)
