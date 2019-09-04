@@ -142,11 +142,20 @@ Changes:
  - Implemented a "frist run" part to set MQTT messages at script start to reflect actual status of inputs, not last known status maintained in MQTT broker or no status at al. 
  - tested UART (extension module) and that works. Changed config file with example
 
+### Version 0.3
+Changes:
+ - Changed the thread part so threading and especially the stop thread part now works correctly
+ - Changed the MQTT send part to make sure that on a handle local action only 1 message is send (was 4). Now works nicely
+ - Revamped the threaded function like duration and transition to be interuptable
+ - Changed code for the 1 wire devices. Upgrade of Evok changed the naming convention for those devices from "temp" to "1wire". Now handled again.
+ 
+
 ## ToDo
   - Something with authenticaton
   - Use config file for client part too
   - clean up code more
   - many other yet to discover things.
+  - make websocket reconnect on disconnect
 
 # Test info
 
