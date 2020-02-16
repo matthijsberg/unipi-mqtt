@@ -23,7 +23,7 @@ Setup:
  - Copy the 3 scripts into a dir
  - Adjust the vars in the script to your needs, like IP, etc.
  - Adjust the unipi_mqtt_config.json file to refelxt your unipi and the connected devices to it (see below for more details)
- - optional; Create a service based on this script (example to do so here; http://www.diegoacuna.me/how-to-run-a-script-as-a-service-in-raspberry-pi-raspbian-jessie/)
+ - optional; Create a service based on this script (example to do so here; https://github.com/MydKnight/PiClasses/wiki/Making-a-script-run-as-daemon-on-boot)
  - Start the service or script and see what happens. 
  - Logging goes to /var/log/unipi_mqtt.log
 
