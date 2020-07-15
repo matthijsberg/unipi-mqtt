@@ -1,8 +1,8 @@
 #!/usr/bin/python
 #	Title: unipipython.py
 #	Author: Matthijs van den Berg
-#	Date: 2018 somewhere
-#	Version 0.1 alfa
+#	Date: 2018-2020 somewhere
+#	Version 0.2 beta
 #	Information from https://evok.api-docs.io/1.0/rest
 
 # VAN VOORBEELD SCRIPT BOVENSTAANDE SITE
@@ -98,10 +98,10 @@ class unipython(object):
 			status=r.json()
 			if(status['value'] == 0):
 				unipython.set_on(self, dev, circuit)
-				return(0,r.status_code)
+				return(1,r.status_code)
 			elif(status['value'] == 1):
 				unipython.set_off(self, dev, circuit)
-				return(1,r.status_code)
+				return(0,r.status_code)
 			else:
 				return(667,r.status_code)#print('Geen matchende status gevonden van 0 of 1')
 		else:
