@@ -33,7 +33,7 @@ Setup:
 
 A config file is used to describe to inputs on the UniPi so the script knows what to send out when a change on a input is detected. An example config file is in the repo, here an example entry. It's JSON, so make sure it's valid. 
 
-Example PIR sensor for motion detection:
+Example PIR sensor for motion detection in unipi_mqtt_config.json:
 ```json
    {
       "circuit":"1_04",
