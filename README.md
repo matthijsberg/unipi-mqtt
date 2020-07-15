@@ -6,7 +6,9 @@ Script creates a websocket connection to EVOK and based on those websocket messa
 
 Also creates a MQTT listener to listen to incomming MQTT topics and switch UniPi outputs based on those messages. I created the system in such a way that info to switch an output must be in the MQTT message. See the Hass examples below. 
 
-WARNING: I am not a programmer, so this code kinda works, but it ain't pretty ;-) (I think...). So there is a big chance you need to tinker a bit in the scripts. It's also a version 1 that I build specifically for my home assistant setup, so it's quite tailored to my personal need and way of working. 
+WARNING: I am not a programmer, so this code kinda works, but it ain't pretty ;-) (I think...). So there is a big chance you need to tinker a bit in the scripts. It's also a version 1 that I build specifically for my home assistant setup, so it's quite tailored to my personal need and way of working.
+
+Update July 2020, I have a 'unipi friend' in Belgium now that has a setup too, and changes this to be a bit more generic, so perhaps a bit broader applicable. 
 
 Be sure to use the 2 python scripts (python3) and the json config file. 
 
@@ -19,12 +21,12 @@ Prereq:
  - MQTT Broker somewhere
  
 Setup:
- - make sure you have all the required packes (python 3 and "pip3 install paho-mqtt threaded websocket-client statistics")
+ - make sure you have all the required packes (python 3 and "pip3 install paho-mqtt threaded websocket-client statistics requests")
  - Copy the 3 scripts into a dir
  - Adjust the vars in the script to your needs, like IP, etc.
  - Adjust the unipi_mqtt_config.json file to refelxt your unipi and the connected devices to it (see below for more details)
  - optional; Create a service based on this script (example to do so here; https://github.com/MydKnight/PiClasses/wiki/Making-a-script-run-as-daemon-on-boot) Example file in this github (unipi_mqtt.service)
- - Start the service or script and see what happens. 
+ - Start the service or script and see what happens (sudo service start unipi_mqtt)
  - Logging goes to /var/log/unipi_mqtt.log
 
 ## UniPi unipi_mqtt_config.json
@@ -46,11 +48,26 @@ Example PIR sensor for motion detection:
    },
 ```
 
+The HA part for this is a binary sensor: 
+```
+- platform: mqtt
+  name: "Kantoor Motion"
+  unique_id: "kantoor_motion"
+  state_topic: "unipi/bgg/kantoor/motion"
+  payload_on: "ON"
+  payload_off: "OFF"
+  availability_topic: "unipi/bgg/kantoor/motion/available"
+  payload_available: "online"
+  payload_not_available: "offline"
+  qos: 0
+  device_class: presence
+```
+
 ### 3 Handle local options
 Example unipi_mqtt_config.json with "handle local" function to handle a local "critical" function within the script so it works without HA or other MQTT connections. 
 
 #### Handle Local Bel (on AND off switch of relay in 1 action)
-This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total actions).
+This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total actions). The bel I use is a Friendland bel on 12 or 24 volt. It rings once on power on and power off (power on pulls the ring stick, power off launches it to ring quite loud). 
 
 ```json
    {
@@ -72,6 +89,15 @@ This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total 
       "unipi_prev_value_timstamp":0,
       "state_topic": "unipi/bgg/voordeur/beldrukker"
    }
+```
+
+I trigger this in HA from a automation where the action part is;
+```
+  action:
+    - service: mqtt.publish
+      data:
+        topic: 'homeassistant/bgg/hal/bel/set'
+        payload: '{"circuit": "2_01", "dev": "relay", "repeat": "1", "state": "pulse"}'
 ```
 
 #### Handle Local Light Dimmer (Analog output 0-10 volt).
