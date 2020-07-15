@@ -274,6 +274,7 @@ Changes:
  - Changed the time based interval to a clock instead of imconning messages to be a bit more precise. 
  - Changes handle local for swithes. Was sending back a wrong MQTT topic for my HA config to work (MIGHT BE BREAKING CHANGE). 
  - Changed a bug in unipython.py where switch status for on / off was the wrong way around.
+ - 0.41 has a small fix to honor the "level" information in unipi_mqtt_config for handle local dimmmers.
 
 ## ToDo
   - Something with certificates
