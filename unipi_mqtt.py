@@ -713,20 +713,15 @@ def handle_local_switch_toggle(message_dev,config_dev):
 	if config_dev["handle_local"]["type"] == 'dimmer':
 		logging.debug('{}: Dimmer Toggle Running.'.format(get_function_name()))
 		status,success=(unipy.toggle_dimmer("analogoutput",config_dev["handle_local"]["output_circuit"],config_dev["handle_local"]["level"]))
-		logging.error('{}: "level: " {}'.format(get_function_name(),config_dev["handle_local"]["level"]))
 		# unipy.toggle_dimmer('analogoutput', '2_03', 7)
 		if success == 200: # I know, mixing up status and succes here from the unipython class... some day ill fix it. 
 			if status == 0:
 				mqtt_message = '{"state": "off", "circuit": "' + config_dev["handle_local"]["output_circuit"] + '", "dev": "analogoutput"}'
-				#mqtt_message = '{"state": "off", "circuit": "' + config_dev["handle_local"]["output_circuit"] + '", "dev": "analogoutput"}'
-				#mqtt_topic_ack(config_dev["state_topic"], mqtt_message)
 				mqtt_topic_set(config_dev["state_topic"], mqtt_message) #(we send a set too, to maks sure we stop threads in mqtt_client)
 				logging.info('{}: Handle Local toggled analogoutput {} to OFF'.format(get_function_name(),config_dev["handle_local"]["output_circuit"]))
 			elif status == 1:
 				brightness = math.ceil(config_dev["handle_local"]["level"] * 25.5)
-				logging.error('{}: "brightness: " {}'.format(get_function_name(),str(brightness)))
 				mqtt_message = '{"state": "on", "circuit": "' + config_dev["handle_local"]["output_circuit"] + '", "dev": "analogoutput", "brightness": ' + str(brightness) + '}'
-				#mqtt_topic_ack(config_dev["state_topic"], mqtt_message)
 				mqtt_topic_set(config_dev["state_topic"], mqtt_message) #(we send a set too, to maks sure we stop threads in mqtt_client)
 				logging.info('{}: Handle Local toggled analogoutput {} to ON'.format(get_function_name(),config_dev["handle_local"]["output_circuit"]))
 			elif (status == 666 or status == 667):
