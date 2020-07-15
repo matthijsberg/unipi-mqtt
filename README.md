@@ -67,7 +67,42 @@ Example with "handle local" function to handle a local "critical" function withi
       "unipi_prev_value":0,
       "unipi_prev_value_timstamp":0,
       "state_topic": "unipi/bgg/voordeur/beldrukker"
-   },
+   }
+```
+
+Example of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source).
+
+```{
+      "circuit":"3_02",
+      "description":"Schakelaar Bijkeuken Licht",
+      "dev":"input",
+      "handle_local":
+            {
+	            "type": "dimmer",
+	            "output_dev": "analogoutput",
+		    "output_circuit": "2_03",
+		    "level": 10
+	    },
+      "device_normal":"no",
+      "state_topic": "homeassistant/bgg/bijkeuken/licht"
+   }
+```
+
+Example of handle local switch (on / off only, relay or digital output used to switch a device or powersource to a device).
+
+```{
+      "circuit":"UART_4_4_04",
+      "description":"TEST IN FUTURE Schakelaar Woonkamer Eker Licht",
+      "dev":"input",
+      "handle_local":
+        {
+	        "type": "switch",
+	        "output_dev": "output",
+		"output_circuit": "2_02"
+	},
+      "device_normal":"no",
+      "state_topic": "homeassistant/bgg/meterkast/testrelay"
+   }
 ```
 
 Description of the fields:
@@ -99,7 +134,7 @@ Example for sensor (from UniPi input to HASSIO)
   device_class: presence
   #retain: true
 ```  
-Example for light (publish from HASS to UniPi to turn on an output)
+Example for dimmable light (publish from HASS to UniPi to turn on an output)
 ```
 - platform: mqtt
   schema: template
@@ -148,18 +183,25 @@ Changes:
  - Changed the MQTT send part to make sure that on a handle local action only 1 message is send (was 4). Now works nicely
  - Revamped the threaded function like duration and transition to be interuptable
  - Changed code for the 1 wire devices. Upgrade of Evok changed the naming convention for those devices from "temp" to "1wire". Now handled again.
- 
+
+### Version 0.4
+Changes:
+ - Added authentication for MQTT with username and password variable since the standard MQTT broker in HA requires this from now on.
+ - Added a counter function to count pulses coming in on a digital input. Counter totals and counter delta for X time can be send via MQTT. Personally use this for a water flow meter that procuces pulse for every X ML.
+ - Changed the time based interval to a clock instead of imconning messages to be a bit more precise. 
+ - Changes handle local for swithes. Was sending back a wrong MQTT topic for my HA config to work (MIGHT BE BREAKING CHANGE). 
+ - Changed a bug in unipython.py where switch status for on / off was the wrong way around.
 
 ## ToDo
-  - Something with authenticaton
-  - Use config file for client part too
+  - Something with certificates
+  - Use config file for client part too?
   - clean up code more
   - many other yet to discover things.
   - make websocket reconnect on disconnect
 
 # Test info
 
-Tested on a UniPi 513 with Extensio xS30 running Evok 2.x and Home Assistant 0.93
+Tested on a UniPi 513 with Extensio xS30 running Evok 2.x and Home Assistant 0.102
 Used:
  - 0-10v inputs and outputs
  - relay outputs
