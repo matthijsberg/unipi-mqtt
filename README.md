@@ -46,7 +46,11 @@ Example PIR sensor for motion detection:
    },
 ```
 
-Example with "handle local" function to handle a local "critical" function within the script.
+### 3 Handle local options
+
+#### Handle Local Bel (on AND off switch of relay in 1 action)
+
+Example unipi_mqtt_config.json with "handle local" function to handle a local "critical" function within the script. This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total actions).
 
 ```json
    {
@@ -70,7 +74,9 @@ Example with "handle local" function to handle a local "critical" function withi
    }
 ```
 
-Example of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source).
+#### Handle Local Light Dimmer (Analog output 0-10 volt)
+
+Example unipi_mqtt_config.json of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source).
 
 ```{
       "circuit":"3_02",
@@ -88,7 +94,10 @@ Example of a handle local switch with dimmer (analog output 0-10 volt is used to
    }
 ```
 
-Example of handle local switch (on / off only, relay or digital output used to switch a device or powersource to a device).
+#### Handle Local Switch (output or relayoutput toggle)
+
+Example unipi_mqtt_config.json of handle local switch (on / off only, relay or digital output used to switch a device or powersource to a device).
+It will poll the unipi box and toggle the output to the other state. So on becomes off and visa versa. A MQTT message refecling this is send. HA need to have the some topic and payload to recognise a change in the HA GUI.
 
 ```{
       "circuit":"UART_4_4_04",
@@ -105,7 +114,24 @@ Example of handle local switch (on / off only, relay or digital output used to s
    }
 ```
 
-Description of the fields:
+The HA part of this switch looks like (for me under lights in YAML):
+```
+- platform: mqtt
+  schema: template
+  name: "Test Relay 2_02"
+  unique_id: "test_relay_2_02"
+  state_topic: "homeassistant/bgg/meterkast/testrelay"
+  command_topic: "homeassistant/bgg/meterkast/testrelay/set"
+  availability_topic: "homeassistant/bgg/meterkast/testrelay/available"
+  payload_available: "online"
+  payload_not_available: "offline"
+  command_on_template: '{"state": "on", "circuit": "2_02", "dev": "output"}'
+  command_off_template: '{"state": "off", "circuit": "2_02", "dev": "output"}'
+  state_template: '{{ value_json.state }}'
+  qos: 0
+```
+
+## Description of the fields:
  - dev: The input device type on the UniPi
  - circuit: The input circuit on the UniPi
  - description: Description of what you do with this input
