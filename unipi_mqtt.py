@@ -4,7 +4,7 @@
 # No fancy coding to see here, please move on (Build by a complete amateur ;-) )
 # Matthijs van den Berg / https://github.com/matthijsberg/unipi-mqtt
 # MIT License
-# version 0.3
+# version 0.40 july 020
 
 # resources used besides google;
 # - http://jasonbrazeal.com/blog/how-to-build-a-simple-iot-system-with-python/
@@ -18,7 +18,7 @@ import logging
 import datetime
 from unipipython import unipython
 import os
-import time
+import time, traceback
 import threading
 import websocket
 import traceback
@@ -35,8 +35,8 @@ import math
 mqtt_address = "192.168.1.126"
 mqtt_subscr_topic = "homeassistant/#" #to what channel to listen for MQTT updates to switch stuff. I use a "send by" topic here as example.
 mqtt_client_name = "UNIPI-MQTT"
-mqtt_user = "none" #not implemented auth for mqtt yet
-mqtt_pass = "none"
+mqtt_user = "unipi01" #not implemented auth for mqtt yet
+mqtt_pass = "abc123ABC!@#"
 # Websocket Connection Variables
 ws_server = "192.168.1.125"
 ws_user = "none" #not implemented auth for ws yet
@@ -99,6 +99,17 @@ def StopThread(thread_id):
 def get_function_name():
     return traceback.extract_stack(None, 2)[0][2]
 
+def every(delay, task):
+	next_time = time.time() + delay
+	while True:
+		time.sleep(max(0, next_time - time.time()))
+		try:
+			task()
+		except Exception:
+			logging.warning('{}: Problem while executing repetitive task.'.format(get_function_name()))
+		# skip tasks if we are behind schedule:
+		next_time += (time.time() - next_time) // delay * delay + delay
+	
 ########################################################################################################################
 ###   Functions to handle the incomming MQTT messages, filter, sort, and kick off the action functions to switch.    ###
 ########################################################################################################################
@@ -217,8 +228,10 @@ def ws_sanity_check(message):
 				message_sort(message_dev)
 			else:
 				logging.debug('Ignoring received data, it is not a dict: {}'.format(device))
-	# Check if we need to switch off something. This is handled here since this function triggers every second (analoge input update freq.) NEEDS SEP FUNCTION		
-	off_commands()
+	# Check if we need to switch off something. This is handled here since this function triggers every second (analoge input update freq.).
+	# off_commands()
+	# fire a function that checks things based on time (off_commands does that too, but to switch devices off) 
+	#timed_updates() #for now integrated in off_commands since it uses the same logic.
 
 def message_sort(message_dev):
 # Function to sort to different websocket messages for processing based on device type (dev)
@@ -245,17 +258,34 @@ def dev_di(message_dev):
 	tijd = time.time()
 	in_list_cntr = 0
 	for config_dev in devdes:
-		if (config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == 'input'):						# To check if device switch is in config file and is an input
-			handle_local_presence = 'handle_local' in config_dev 													# becomes True is "handle local" is found in cofig
-			device_delay_presence = 'device_delay' in config_dev 													# becomes True is "device_delay" is found in cofig
-			if (device_delay_presence == True):
-				device_delay_local = config_dev['device_delay']
-				if config_dev['device_delay'] == 0: device_delay_presence = False									# Disable device delay if delay is 0 (should not be like that but be deleted from config, but it happens)
-			if (device_delay_presence == True):
+		if (config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == 'input'):							# To check if device switch is in config file and is an input
+			raw_mode_presence = 'raw_mode' in config_dev																# becomes True is "raw_mode" is found in config
+			device_type_presence = 'device_type' in config_dev															# becomes True is "device_type" is found in config
+			handle_local_presence = 'handle_local' in config_dev 														# becomes True is "handle local" is found in config
+			device_delay_presence = 'device_delay' in config_dev														# becomes True is "device_delay" is found in config
+			if device_delay_presence == True:
+				if config_dev['device_delay'] == 0: device_delay_presence = False
+			unipi_value_presence = 'unipi_value' in config_dev	
+			# If raw mode is selected a WEbdav message will only be transformed into a MQTT message, nothing else.
+			if (raw_mode_presence == True):																				# RAW modes just pushes all fields in the websocket message out via MQTT TODO
+				logging.error('    {}: TO BE IMPLEMENTED".'.format(get_function_name()))#todo. Can we just add input iD and raw to make this work? stop the loop here? 
+				device_type_presence = 'device_type' in config_dev														# becomes True is "device_type" is found in config
+			# Implemented device types per 2020 to filter counter for pulse based counter devices like water meters. Just count counter on NO devices that turn on. Since WebDav does not send a trigger for every update we calculate the delta betwee this and the previous update. 
+			elif (device_type_presence == True):
+				if (config_dev['device_type'] == 'counter'):
+					if (('max_delay_value' in config_dev) or ('device_delay' in config_dev)) is False:
+						logging.error('{}: Error in Config file, missing fields'.format(get_function_name()))
+					else:
+						config_dev['counter_value'] = message_dev['counter']
+						if (config_dev["counter_value"] == 0): #for bootup of script to set initial value
+							config_dev["counter_value"] = message_dev["counter"]
+							if (config_dev["unipi_value"] == 0):
+								config_dev["unipi_value"] = (message_dev["counter"] -1)
+				else: logging.error('{}: Unknown device type "{}", breaking.'.format(get_function_name(),config_dev['device_type']))
+			elif (device_delay_presence == True):
 			# Running devices with delay to reswitch (like pulse bsed motion sensors that pulse on presence ever 10 sec to on) Using no / nc and delay to switch
 			# We should only see "ON" here! Off messages are handled in function off_commands 
 				logging.debug('{}: Loop with delay with message: {}'.format(get_function_name(),message_dev))
-				tijd = time.time()
 				if tijd >= (config_dev['unipi_prev_value_timstamp'] + config_dev['device_delay']):
 					if (message_dev['value'] == 1):
 						if (config_dev['unipi_value'] == 1):
@@ -265,21 +295,17 @@ def dev_di(message_dev):
 							if handle_local_presence == True: handle_local_switch_on_or_toggle(message_dev,config_dev)
 							config_dev['unipi_value'] = message_dev['value']
 							config_dev['unipi_prev_value_timstamp'] = tijd
-						elif(config_dev['device_normal'] == 'nc' and device_delay_presence == False): #should never run!
-							dev_switch_off(config_dev['state_topic']) 														# Turn off devices that switch to their normal mode and have no delay configured! Delayed devices will be turned off somewhere else
-							if handle_local_presence == True: handle_local_switch_toggle(message_dev,config_dev)
-							config_dev['unipi_value'] = message_dev['value']
-							config_dev['unipi_prev_value_timstamp'] = tijd
+						elif(config_dev['device_normal'] == 'nc'): #should never run!
+							#should not do anything since and off commands are handled in off_commands def.
+							logging.debug('{}: This should do nothing since off commands are not handled here. Config: {}, Received message: {}'.format(get_function_name(),message_dev,config_dev))
 						else:
 							logging.error('{}: Unhandled Exception 1, config: {}, status: {}, normal_config: {}, {}, {}'.format(get_function_name(),config_dev['unipi_value'],message_dev['value'],config_dev['device_normal'],message_dev['circuit'],config_dev['state_topic']))
 					elif (message_dev['value'] == 0):
 						if (config_dev['unipi_value'] == 0):
 							logging.debug('{}: received status 0 is actual status: {}'.format(get_function_name(),message_dev)) #nothing to do, since there is not status change. First in condition to easy load ;-)
-						elif(config_dev['device_normal'] == 'no' and device_delay_presence == False): #should never run!
-							dev_switch_off(config_dev['state_topic']) 														# Turn off devices that switch to their normal mode and have no delay configured! Delayed devices will be turned off somewhere else
-							if handle_local_presence == True: handle_local_switch_toggle(message_dev,config_dev)
-							config_dev['unipi_value'] = message_dev['value']
-							config_dev['unipi_prev_value_timstamp'] = tijd
+						elif(config_dev['device_normal'] == 'no'): #should never run!
+							#should not do anything since and off commands are handled in off_commands def.
+							logging.debug('{}: This should do nothing since off commands are not handled here. Config: {}, Received message: {}'.format(get_function_name(),message_dev,config_dev))
 						elif(config_dev['device_normal'] == 'nc'): 
 							dev_switch_on(config_dev['state_topic'])
 							if handle_local_presence == True: handle_local_switch_on_or_toggle(message_dev,config_dev)
@@ -291,25 +317,30 @@ def dev_di(message_dev):
 						logging.error('{}: Device value not 0 or 1 as expected for Digital Input. Message is: {}'.format(get_function_name(),message_dev))	
 				else:
 					config_dev['unipi_prev_value_timstamp'] = tijd
-					logging.info('{}: new input on DI circuit {} but within configured switch delay, only adjusting timestamp. Message is: {}'.format(get_function_name(),message_dev['circuit'],message_dev))
 			else:
 			# Running devices without delay, always switching on / of based on UniPi Digital Input
 				logging.debug('{}: Loop without delay with message: {}'.format(get_function_name(),message_dev))
 				if (message_dev['value'] == 1):
-					if(config_dev['device_normal'] == 'no'): 															# check if device is normal status is OPEN or CLOSED loop to turn ON / OFF
-						if handle_local_presence == True: handle_local_switch_on_or_toggle(message_dev,config_dev)
+					if(config_dev['device_normal'] == 'no'):
+						if (device_type_presence == True):
+							if (config_dev['device_type'] == 'counter'): mqtt_set_counter(message_dev,config_dev)
+							else: logging.error('{}: Unknown device type "{}", breaking.'.format(get_function_name(),config_dev['device_type']))															# check if device is normal status is OPEN or CLOSED loop to turn ON / OFF
+						elif handle_local_presence == True: handle_local_switch_on_or_toggle(message_dev,config_dev)
 						else: dev_switch_on(config_dev['state_topic']) 													# sends MQTT command, removed as test since this is done in handle_local_switch_toggle too
-					elif(config_dev['device_normal'] == 'nc' and device_delay_presence == False): 						# Turn off devices that switch to their normal mode and have no delay configured! Delayed devices will be turned off somewhere else
+					elif(config_dev['device_normal'] == 'nc'): 						# Turn off devices that switch to their normal mode and have no delay configured! Delayed devices will be turned off somewhere else
 						if handle_local_presence == True: pass # OLD: handle_local_switch_toggle(message_dev,config_dev) # we do a pass since a pulse based switch sends a ON and OFF in 1 action, we only need 1 action to happen! 
 						else: dev_switch_off(config_dev['state_topic']) 												# sends MQTT command, removed as test since this is done in handle_local_switch_toggle too
 					else:
 						logging.debug('{}: ERROR 1, config: {}, normal_config: {}, {}, {}'.format(get_function_name(),message_dev['value'],config_dev['device_normal'],message_dev['circuit'],config_dev['state_topic']))
 				elif (message_dev['value'] == 0):
-					if(config_dev['device_normal'] == 'no' and device_delay_presence == False): 
+					if(config_dev['device_normal'] == 'no'): 
 						if handle_local_presence == True: pass #- OLD:handle_local_switch_toggle(message_dev,config_dev)
 						else: dev_switch_off(config_dev['state_topic']) 												# Turn off devices that switch to their normal mode and have no delay configured! Delayed devices will be turned off somewhere else
-					elif(config_dev['device_normal'] == 'nc'): 
-						if handle_local_presence == True: handle_local_switch_on_or_toggle(message_dev,config_dev)
+					elif(config_dev['device_normal'] == 'nc'):
+						if (device_type_presence == True):
+							if (config_dev['device_type'] == 'counter'): mqtt_set_counter(message_dev,config_dev)
+							else: logging.error('{}: Unknown device type "{}", breaking.'.format(get_function_name(),config_dev['device_type']))
+						elif handle_local_presence == True: handle_local_switch_on_or_toggle(message_dev,config_dev)
 						else: dev_switch_on(config_dev['state_topic'])
 					else:
 						logging.debug('{}: ERROR 2, config: {}, normal_config: {}, {}, {}'.format(get_function_name(),message_dev['value'],config_dev['device_normal'],message_dev['circuit'],config_dev['state_topic']))
@@ -546,30 +577,66 @@ def transition_brightness(desired_brightness,trans_time,dev,circuit,topic,messag
 	else:
 		logging.info('    {}: Actual UniPi status for device {} circuit {} is matching desired state, not changing anything.'.format(get_function_name(),dev,circuit))
 
-
 ### UniPi outputs Switch Commands
 ### Used to switch outputs on the UniPi device based on the websocket message received
 
-def off_commands():
+def off_commands(): 
 	# Function to handle delayed off for devices based on config file. use to switch motion sensors off (get a pulse update every 10 sec)
-	#logging.debug('{}: Starting function.'.format(get_function_name()))
 	tijd = time.time()
 	for config_dev in devdes:
-		if 'device_delay' in config_dev: #Only switch devices off that have a delay > 0. Devices with no delay or delay '0' do not need to turned off or are turned off bij a new status (like door sensor)
+		device_type_presence = 'device_type' in config_dev
+		handle_local_presence = 'handle_local' in config_dev
+		if (device_type_presence == True):
+			if (config_dev['device_type'] == 'counter'): #need this to set counter to 0 via MQTT otherwise only messages with a value are send
+				if (tijd >= (config_dev['unipi_prev_value_timstamp'] + config_dev['device_delay'])):
+					if ((config_dev['counter_value'] >= config_dev['unipi_value']) and (config_dev['counter_value'] > 0)):
+						counter = config_dev["counter_value"]
+						delta = config_dev["counter_value"] - config_dev["unipi_value"] #abuse of unipi value, but since we dont use this for counter devices... 
+						config_dev["unipi_value"] = config_dev["counter_value"]
+						config_dev['unipi_prev_value_timstamp'] = tijd
+						if counter != delta:
+							mqtt_set_counter(config_dev["state_topic"],counter,delta)
+						else:
+							logging.warning('{}: counter ({}) has the same value as ({}), not sending MQTT as this is startup error that I need to fix.'.format(get_function_name(),counter,delta))
+					elif config_dev['counter_value'] == 0:
+						pass #this happens on boot with 0 as value untill the first counter values come in.
+					else:
+						logging.error('{}: Negative value!.'.format(get_function_name()))
+						logging.error('{}:  - config: {}'.format(get_function_name(),config_dev))
+			else: logging.error('{}: Unknown device type "{}", breaking.'.format(get_function_name(),config_dev['device_type']))
+		elif 'device_delay' in config_dev: #Only switch devices off that have a delay > 0. Devices with no delay or delay '0' do not need to turned off or are turned off bij a new status (like door sensor)
 			if config_dev['device_delay'] > 0 and tijd >= (config_dev['unipi_prev_value_timstamp'] + config_dev['device_delay']):
 				#dev_switch_off(config_dev['state_topic']) #device uit zetten
 				#if config_dev['unipi_value'] == 1 and config_dev['device_normal'] == 'no':
 				if config_dev['unipi_value'] == 1 and config_dev['device_normal'] == 'no':
 					dev_switch_off(config_dev['state_topic']) #device uit zetten
+					if handle_local_presence == True: handle_local_switch_toggle(message_dev,config_dev)
 					config_dev['unipi_value'] = 0 # Set var in config file to off
 					logging.info('{}: Triggered delayed OFF after {} sec for "no" device "{}" for MQTT topic: "{}" .'.format(get_function_name(),config_dev['device_delay'],config_dev['description'],config_dev['state_topic']))
 				elif config_dev['unipi_value'] == 0 and config_dev['device_normal'] == 'nc':
 					dev_switch_off(config_dev['state_topic']) #device uit zetten
+					if handle_local_presence == True: handle_local_switch_toggle(message_dev,config_dev)
 					config_dev['unipi_value'] = 1 # Set var in config file to on
 					logging.info('{}: Triggered delayed OFF after {} sec for "nc" device "{}" for MQTT topic: "{}" .'.format(get_function_name(),config_dev['device_delay'],config_dev['description'],config_dev['state_topic']))
 				#else:
 				#	logging.debug('{}: unhandled exception in device switch off'.format(get_function_name()))
 	logging.debug('   {}: EOF.'.format(get_function_name()))
+
+#def timed_updates():
+#	function to send updates based on time, not on message. This is required for deviced where we need to send 0 values too. Currently works for counter devices. 
+#	tijd = time.time()
+#	for config_dev in devdes:
+#		device_type_presence = 'device_type' in config_dev
+#		if (device_type_presence == True):	
+#			if (tijd >= (config_dev['unipi_prev_value_timstamp'] + config_dev['device_delay'])):
+#				if config_dev['counter_value'] >= config_dev['unipi_value']:
+#					counter = config_dev["counter_value"]
+#					delta = config_dev["counter_value"] - config_dev["unipi_value"] #abuse of unipi value, but since we dont use this for counter devices... 
+#					config_dev["unipi_value"] = config_dev["counter_value"]
+#					config_dev['unipi_prev_value_timstamp'] = tijd
+#					mqtt_set_counter(config_dev["state_topic"],counter,delta)
+#				else:
+#					logging.error('{}: Negative value!.'.format(get_function_name(),))
 
 def dev_switch_on(mqtt_topic):
 	# Set via MQTT
@@ -605,6 +672,18 @@ def mqtt_set_humi(mqtt_topic, humi):
 	mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
 	logging.info('{}: Set humidity: {} for MQTT topic: "{}" .'.format(get_function_name(),humi,mqtt_topic))
 
+def mqtt_set_counter(mqtt_topic,counter,delta): #published an MQTT message with a counter delta based on the interval defined or between de messages received. Messages from webdav might not trigger every pulse.
+	logging.debug('Hit Functions {}'.format(get_function_name()))
+	send_msg = {
+   	    "counter_delta": delta,
+   	    "counter":counter
+		}
+	mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
+	logging.info('{}: Set counter {} and delta: {} for topic "{}" .'.format(get_function_name(),counter,delta,mqtt_topic))
+
+#mqtt_message = 'ON'
+#		mqtt_topic_ack(config_dev["state_topic"], mqtt_message)
+
 def mqtt_topic_ack(mqtt_topic, mqtt_message):
 	mqttc.publish(mqtt_topic, payload=mqtt_message, qos=1, retain=False)
 	logging.info('{}: Send MQTT message: "{}" for MQTT topic: "{}" .'.format(get_function_name(),mqtt_message,mqtt_topic))
@@ -622,6 +701,10 @@ def handle_local_switch_on_or_toggle(message_dev,config_dev):
 	if config_dev["handle_local"]["type"] == 'bel':
 		unipy.ring_bel(config_dev["handle_local"]["rings"],"relay",config_dev["handle_local"]["output_circuit"])
 		logging.info('{}: Handle Local is ringing the bel {} times'.format(get_function_name(),config_dev["handle_local"]["rings"]))
+		mqtt_message = 'ON'
+		mqtt_topic_ack(config_dev["state_topic"], mqtt_message) #(we send a set too, to maks sure we stop threads in mqtt_client)
+		mqtt_message = 'OFF'
+		mqtt_topic_ack(config_dev["state_topic"], mqtt_message) #(we send a set too, to maks sure we stop threads in mqtt_client)
 	else:
 		handle_local_switch_toggle(message_dev,config_dev)
 
@@ -629,7 +712,7 @@ def handle_local_switch_toggle(message_dev,config_dev):
 	logging.debug('{}: Starting function with message "{}"'.format(get_function_name(),message_dev))
 	if config_dev["handle_local"]["type"] == 'dimmer':
 		logging.debug('{}: Dimmer Toggle Running.'.format(get_function_name()))
-		status,success=(unipy.toggle_dimmer("analogoutput",config_dev["handle_local"]["output_circuit"],10))
+		status,success=(unipy.toggle_dimmer("analogoutput",config_dev["handle_local"]["output_circuit"],config_dev["handle_local"]["level"]))
 		# unipy.toggle_dimmer('analogoutput', '2_03', 7)
 		if success == 200: # I know, mixing up status and succes here from the unipython class... some day ill fix it. 
 			if status == 0:
@@ -653,11 +736,13 @@ def handle_local_switch_toggle(message_dev,config_dev):
 		status,success=(unipy.toggle_switch("output",config_dev["handle_local"]["output_circuit"]))
 		if success == 200:
 			if status == 0:
-				mqtt_message = 'OFF'
+				#mqtt_message = 'OFF' #used this for simple MQTT ack message, but looks like I don't use this, so changing to more advanced json MQTT message. This mist match payload_on / off messages!
+				mqtt_message = '{"state": "off", "circuit": "' + config_dev["handle_local"]["output_circuit"] + '", "dev": "output"}'
 				mqtt_topic_set(config_dev["state_topic"], mqtt_message) #(we send a set too, to maks sure we stop threads in mqtt_client)
 				logging.info('{}: Handle Local toggled output {} to OFF'.format(get_function_name(),config_dev["handle_local"]["output_circuit"]))
 			elif status == 1:
-				mqtt_message = 'ON'
+				#mqtt_message = 'ON' #used this for simple MQTT ack message, but looks like I don't use this, so changing to more advanced json MQTT message. This mist match payload_on / off messages at HA to work / show status there.
+				mqtt_message = '{"state": "on", "circuit": "' + config_dev["handle_local"]["output_circuit"] + '", "dev": "output"}'
 				mqtt_topic_set(config_dev["state_topic"], mqtt_message) #(we send a set too, to maks sure we stop threads in mqtt_client)
 				logging.info('{}: Handle Local toggled output {} to ON'.format(get_function_name(),config_dev["handle_local"]["output_circuit"]))
 			elif (status == 666 or status == 667):
@@ -670,8 +755,7 @@ def handle_local_switch_toggle(message_dev,config_dev):
 		logging.error('{}: Unhandled exception in function config type: {}'.format(get_function_name(),config_dev["handle_local"]["type"]))
 	logging.debug('{}: EOF.'.format(get_function_name()))
 
-
-### MQTT FUNCTIONS ###
+### MQTT CONNECTION FUNCTIONS ###
 
 def mqtt_ack(topic,message):
 	#Function to adjust MQTT message / topic to return to sender.
@@ -737,7 +821,7 @@ def on_mqtt_close(ws):
 def on_mqtt_log(client, userdata, level, buf):
     logging.debug('{}: {}'.format(get_function_name(),buf))
 
-### WEBSOCKET FUNCTIONS ###
+### WEBSOCKET CONNECTION FUNCTIONS ###
 
 def on_ws_open(ws):
 	logging.info('{}: WebSockets connection is open in a separate thread!'.format(get_function_name()))
@@ -772,6 +856,7 @@ def firstrun():
 if __name__ == "__main__":
 	### setting some housekeeping functions and globel vars
 	# DEVmonitoring_thread = start_monitoring(seconds_frozen=31, test_interval=15000)
+	# ORGIGINAL logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s',filename=logging_path,level=logging.ERROR,datefmt='%Y-%m-%d %H:%M:%S') #DEBUG,INFO,WARNING,ERROR,CRITICAL
 	logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s',filename=logging_path,level=logging.ERROR,datefmt='%Y-%m-%d %H:%M:%S') #DEBUG,INFO,WARNING,ERROR,CRITICAL
 	urllib3_log = logging.getLogger("urllib3") #ignoring informational logging from called modules (rest calls in this case) https://stackoverflow.com/questions/24344045/how-can-i-completely-remove-any-logging-from-requests-module-in-python
 	urllib3_log.setLevel(logging.CRITICAL) 
@@ -790,11 +875,12 @@ if __name__ == "__main__":
 	mqttc.on_subscribe = on_mqtt_subscribe
 	mqttc.on_unsubscribe = on_mqtt_unsubscribe
 	mqttc.on_message = on_mqtt_message
+	mqttc.username_pw_set(username=mqtt_user,password=mqtt_pass)
 	mqttc.connect(mqtt_address, 1883, 600,) #define MQTT server settings
 	t_mqtt = threading.Thread(target=mqttc.loop_forever) #define a thread to run MQTT connection
 	t_mqtt.start() #Start connection to MQTT in thread so non-blocking 
 	
-	### WebSocket Connection. Must be in main to be referenced from other functions like ws.send .
+	### WebSocket Connection. Must be in main to be referenced from other functions like ws.send 
 	ws_header = {'Authorization': 'Basic {0}','ClientID': 'UniPI'}
 	ws_protocol = 'ws' #wss if secure
 	ws_url = (ws_protocol + "://" + ws_server + "/ws")
@@ -806,3 +892,6 @@ if __name__ == "__main__":
 							### WebSocket to connect to the broker, subscribe to messages (optional) and loop this forever in a thread so non-blocking				
 	t_ws = threading.Thread(target=ws.run_forever)
 	t_ws.start() #Start connection to WebSocket in thread so non-blocking	
+
+	### Time function so we're not dependent of incomming commands to trigger things
+	threading.Thread(target=lambda: every(1, off_commands)).start()
