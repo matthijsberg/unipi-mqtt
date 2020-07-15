@@ -47,10 +47,10 @@ Example PIR sensor for motion detection:
 ```
 
 ### 3 Handle local options
+Example unipi_mqtt_config.json with "handle local" function to handle a local "critical" function within the script so it works without HA or other MQTT connections. 
 
 #### Handle Local Bel (on AND off switch of relay in 1 action)
-
-Example unipi_mqtt_config.json with "handle local" function to handle a local "critical" function within the script. This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total actions).
+This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total actions).
 
 ```json
    {
@@ -74,9 +74,10 @@ Example unipi_mqtt_config.json with "handle local" function to handle a local "c
    }
 ```
 
-#### Handle Local Light Dimmer (Analog output 0-10 volt)
+#### Handle Local Light Dimmer (Analog output 0-10 volt).
+Example unipi_mqtt_config.json of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source). I user 0-10 volt (not 1-10!) led dimmers. Works flawlessly. Note that the Level in unipi = 0-10 and in HA 0-255 for 0-100%. 
 
-Example unipi_mqtt_config.json of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source).
+unipi_mqtt_config.json:
 
 ```{
       "circuit":"3_02",
@@ -94,10 +95,40 @@ Example unipi_mqtt_config.json of a handle local switch with dimmer (analog outp
    }
 ```
 
-#### Handle Local Switch (output or relayoutput toggle)
+The HA part can look like:
 
+```
+- platform: mqtt
+  schema: template
+  name: "Woonkamer Nis light"
+  unique_id: "woonkamer_nis_licht"
+  state_topic: "homeassistant/bgg/woonkamer/nis/licht"
+  command_topic: "homeassistant/bgg/woonkamer/nis/licht/set"
+  availability_topic: "homeassistant/bgg/woonkamer/nis/licht/available"
+  payload_available: "online"
+  payload_not_available: "offline"
+  command_on_template: >
+    {"state": "on"
+    , "circuit": "2_04"
+    , "dev": "analogoutput"
+    {%- if brightness is defined -%}
+    , "brightness": {{ brightness }}
+    {%- elif brightness is undefined -%}
+    , "brightness": 100
+    {%- endif -%}
+    {%- if transition is defined -%}
+    , "transition": {{ transition }}
+    {%- endif -%}
+    }
+  command_off_template: '{"state": "off", "circuit": "2_04", "dev": "analogoutput"}'
+  state_template: '{{ value_json.state }}'
+  brightness_template: '{{ value_json.brightness }}'
+  qos: 0
+```
+
+#### Handle Local Switch (output or relayoutput toggle)
 Example unipi_mqtt_config.json of handle local switch (on / off only, relay or digital output used to switch a device or powersource to a device).
-It will poll the unipi box and toggle the output to the other state. So on becomes off and visa versa. A MQTT message refecling this is send. HA need to have the some topic and payload to recognise a change in the HA GUI.
+It will poll the unipi box and toggle the output to the other state. So on becomes off and visa versa. A MQTT message reflecting this is send. HA need to have the some topic and payload to recognise a change in the HA GUI.
 
 ```{
       "circuit":"UART_4_4_04",
