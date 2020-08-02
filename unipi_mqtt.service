@@ -1,11 +1,14 @@
 [Unit]
 Description=UniPi to MQTT Message Service
 After=multi-user.target
+StartLimitInterval=200
+StartLimitBurst=8
 
 [Service]
 Type=simple
 ExecStart=/usr/bin/python3 /home/pi/scripts/unipi_mqtt.py
-Restart=on-abort
+Restart=always
+RestartSec=30
 
 [Install]
 WantedBy=multi-user.target
