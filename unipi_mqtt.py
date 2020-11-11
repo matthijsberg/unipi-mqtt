@@ -4,7 +4,7 @@
 # No fancy coding to see here, please move on (Build by a complete amateur ;-) )
 # Matthijs van den Berg / https://github.com/matthijsberg/unipi-mqtt
 # MIT License
-# version 0.41 july 020
+# version 11.2020  (new version numbering since that's really face these days)
 
 # resources used besides google;
 # - http://jasonbrazeal.com/blog/how-to-build-a-simple-iot-system-with-python/
@@ -21,6 +21,7 @@ import os
 import time, traceback
 import threading
 import websocket
+from websocket import create_connection
 import traceback
 from collections import OrderedDict
 from statistics import mean, median
@@ -32,13 +33,13 @@ import math
 ########################################################################################################################
 
 # MQTT Connection Variables
-mqtt_address = "192.168.1.126"
+mqtt_address = "192.168.1.x"
 mqtt_subscr_topic = "homeassistant/#" #to what channel to listen for MQTT updates to switch stuff. I use a "send by" topic here as example.
-mqtt_client_name = "UNIPI-MQTT"
-mqtt_user = "unipi01" #not implemented auth for mqtt yet
+mqtt_client_name = "UNIPI2-MQTT"
+mqtt_user = "unipi02"
 mqtt_pass = "abc123ABC!@#"
 # Websocket Connection Variables
-ws_server = "192.168.1.125"
+ws_server = "192.168.1.x"
 ws_user = "none" #not implemented auth for ws yet
 ws_pass = "none"
 # Generic Variables
@@ -48,6 +49,7 @@ dThreads = {} #keeping track of all threads running
 
 ########################################################################################################################
 ###                     Some housekeeping functions to handle threads, logging, etc.                                 ###
+###                          NO CHANGES AFTER THIS REQUIRED FOR NORMAL USE!                                          ###
 ########################################################################################################################
 
 class StoppableThread(threading.Thread): # Implements a thread that can be stopped.
@@ -365,7 +367,7 @@ def dev_ai(message_dev):
 				logging.debug('PING Received WebSocket data and collected 30 samples of lux data : {}'.format(message_dev)) #we're loosing websocket connection, debug
 
 def dev_relay(message_dev):
-	pass #still need to figure out what to do with this. 
+	pass #still need to figure out what to do with this. RELAYS ARE HANDLED AS OUTPUT.
 
 def dev_modbus(message_dev):
 # Function to handle Analoge Inputs from WebSocket (UniPi), mainly focussed on LUX from analoge input now. using a sample rate to reduce MQTT massages. TODO needs to be improved!
@@ -401,7 +403,6 @@ def dev_modbus(message_dev):
 		except ValueError as e:
 			logging.error('Message "{}" not a valid JSON - message not processed, error is "{}".'.format(message_dev,e))
 
-
 ### Functions to switch outputs on the UniPi
 ### Used for incomming messages from MQTT and switches UniPi outputs conform the message received
 
@@ -413,7 +414,7 @@ def set_repeat(dev,circuit,repeat,topic,message):
 	ctr = 0
 	while repeat > ctr and thread.is_running(): 
 		stat_code_on = (unipy.set_on(dev,circuit))
-		time.sleep(0.001) # time for output on
+		time.sleep(0.1) # time for output on
 		stat_code_off = (unipy.set_off(dev,circuit))
 		if ctr == 0: #set MQTT responce on so icon turn ON while loop runs
 			mqtt_ack(topic,message)
@@ -532,11 +533,12 @@ def transition_brightness(desired_brightness,trans_time,dev,circuit,topic,messag
 			# we need to set a start level via MQTT here as otherwise the device won't show as on when stating transition. Do not include in loop, too slow. 
 			step_increase = float(delta_level / number_steps)
 			#logging.debug('TRANSITION DEBUG 2; number of steps: {} and tread.is_running: {}'.format(number_steps,thread_status))
-			### Threaded part from here, using the stop_thread function to interrupt when needed. Thread.is_running makes sure we listen to external stop signals ###
+			short_lived_ws = create_connection("ws://" + ws_server + "/ws")		#setting up a websocket connect here to send the change commands over. Cannot go to global WS since that is in a function and that won't accept commands from here. Maybe one day change to asyncio websocket?
+			### Using the stop_thread function to interrupt when needed. Thread.is_running makes sure we listen to external stop signals ###
 			while int(number_steps) > 0 and thread.is_running(): 
 				new_level = round(new_level + step_increase,1)
 				stat_code = 1 #(unipy.set_level(circuit, new_level))
-				ws.send('{"cmd":"set","dev":"' + dev + '","circuit":"' + circuit + '","value":' + str(new_level) + '}')
+				short_lived_ws.send('{"cmd":"set","dev":"' + dev + '","circuit":"' + circuit + '","value":' + str(new_level) + '}')
 				#Test, send mqtt message to switch device on on every change (maybe throttle in future/). If we don't HA will still thinks it's off while the loop turned it on. With long times this can mess up automations
 				temp_level = math.ceil(new_level * 25.5)
 				message.update({"brightness":temp_level}) #replace requested level with actual level in orderd dict action
@@ -572,6 +574,7 @@ def transition_brightness(desired_brightness,trans_time,dev,circuit,topic,messag
 					logging.warning('   {}: Successful Finished thread {}, now deleting thread information from global thread var'.format(get_function_name(),thread_id))
 					del dThreads[thread_id]
 				logging.debug('   {}: EOF.'.format(get_function_name()))
+			short_lived_ws.close() # Closing the websocket connection for this function and interation. 
 		else:
 			logging.error('    {}: delta_level != number_steps.'.format(get_function_name(),dev,circuit))
 	else:
@@ -622,26 +625,8 @@ def off_commands():
 				#	logging.debug('{}: unhandled exception in device switch off'.format(get_function_name()))
 	logging.debug('   {}: EOF.'.format(get_function_name()))
 
-#def timed_updates():
-#	function to send updates based on time, not on message. This is required for deviced where we need to send 0 values too. Currently works for counter devices. 
-#	tijd = time.time()
-#	for config_dev in devdes:
-#		device_type_presence = 'device_type' in config_dev
-#		if (device_type_presence == True):	
-#			if (tijd >= (config_dev['unipi_prev_value_timstamp'] + config_dev['device_delay'])):
-#				if config_dev['counter_value'] >= config_dev['unipi_value']:
-#					counter = config_dev["counter_value"]
-#					delta = config_dev["counter_value"] - config_dev["unipi_value"] #abuse of unipi value, but since we dont use this for counter devices... 
-#					config_dev["unipi_value"] = config_dev["counter_value"]
-#					config_dev['unipi_prev_value_timstamp'] = tijd
-#					mqtt_set_counter(config_dev["state_topic"],counter,delta)
-#				else:
-#					logging.error('{}: Negative value!.'.format(get_function_name(),))
-
 def dev_switch_on(mqtt_topic):
 	# Set via MQTT
-	#mqtt_topic_online = (mqtt_topic + "/available")
-	#mqttc.publish(mqtt_topic_online, payload='online', qos=1, retain=True)
 	mqttc.publish(mqtt_topic, payload='ON', qos=1, retain=True)
 	logging.info('{}: Set ON for MQTT topic: "{}".'.format(get_function_name(),mqtt_topic))
 	
@@ -680,9 +665,6 @@ def mqtt_set_counter(mqtt_topic,counter,delta): #published an MQTT message with 
 		}
 	mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
 	logging.info('{}: Set counter {} and delta: {} for topic "{}" .'.format(get_function_name(),counter,delta,mqtt_topic))
-
-#mqtt_message = 'ON'
-#		mqtt_topic_ack(config_dev["state_topic"], mqtt_message)
 
 def mqtt_topic_ack(mqtt_topic, mqtt_message):
 	mqttc.publish(mqtt_topic, payload=mqtt_message, qos=1, retain=False)
@@ -798,7 +780,7 @@ def on_mqtt_subscribe(mqttc, userdata, mid, granted_qos):
 
 
 def on_mqtt_disconnect(mqttc, userdata, rc):
-	logging.warning('{}: MQTT DISConnected from MQTT broker with reason: {}.'.format(get_function_name(),str(rc))) # Return Code (rc)- Indication of disconnect reason. 0 is normal all other values indicate abnormal disconnection
+	logging.critical('{}: MQTT DISConnected from MQTT broker with reason: {}.'.format(get_function_name(),str(rc))) # Return Code (rc)- Indication of disconnect reason. 0 is normal all other values indicate abnormal disconnection
 	if str(rc) == 0:
 		mqttc.unsubscribe(mqtt_subscr_topic)
 		mqtt_offline()
@@ -822,22 +804,45 @@ def on_mqtt_log(client, userdata, level, buf):
 
 ### WEBSOCKET CONNECTION FUNCTIONS ###
 
+def create_ws():
+	while True:
+		try:
+			websocket.enableTrace(False)
+			ws = websocket.WebSocketApp("ws://" + ws_server + "/ws",# header=ws_header,
+				on_open = on_ws_open,
+				on_message = on_ws_message,
+				on_error = on_ws_error,
+				on_close = on_ws_close)
+				### WebSocket to connect to the broker, subscribe to messages (optional) and loop this forever in a thread so non-blocking				
+			t_ws = threading.Thread(target=ws.run_forever(skip_utf8_validation=True,ping_interval=10,ping_timeout=8))
+			t_ws.start() #Start connection to WebSocket in thread so non-blocking	
+		except Exception as e:
+			gc.collect()
+			logging.error("Websocket connection Error  : {0}".format(e))					
+		logging.error("Reconnecting websocket  after 5 sec")
+		time.sleep(5)
+
 def on_ws_open(ws):
-	logging.info('{}: WebSockets connection is open in a separate thread!'.format(get_function_name()))
+	logging.error('{}: WebSockets connection is starting in a separate thread!'.format(get_function_name()))
 	firstrun()
 	#TODO, Build a first run function to set ACTUAL states of UniPi inputs as MQTT message and in config file!
 	
 def on_ws_message(ws, message):
 	ws_sanity_check(message) #This is starting the main message handling for UniPi originating messages
 	#print(ws)
+	#print(message)
 
 def on_ws_close(ws):
-	logging.warning('{}: WebSockets connection is now Closed!'.format(get_function_name()))
-	t_ws.join();
+	logging.critical('{}: WEBSOCKETS CONNECTION CLOSED - THIS WILL PREVENT UNIPI INITIATED ACTIONS FROM RUNNING!'.format(get_function_name()))
+	if t_ws.isAlive():
+		t_ws.join()
+		logging.error('{}: Joined websocket thread into main thread to cleanup thread.'.format(get_function_name()))
+	else:
+		logging.error('{}: WebSockets thread was not foundrunning, in reconnect loop?'.format(get_function_name()))
 	
 def on_ws_error(ws, errors):
 	logging.error('{}: WebSocket Error; "{}"'.format(get_function_name(),errors))
-
+	
 ### First Run Function to set initial state of Inputs
 def firstrun():
 	for config_dev in devdes:
@@ -854,8 +859,6 @@ def firstrun():
 
 if __name__ == "__main__":
 	### setting some housekeeping functions and globel vars
-	# DEVmonitoring_thread = start_monitoring(seconds_frozen=31, test_interval=15000)
-	# ORGIGINAL logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s',filename=logging_path,level=logging.ERROR,datefmt='%Y-%m-%d %H:%M:%S') #DEBUG,INFO,WARNING,ERROR,CRITICAL
 	logging.basicConfig(format='%(asctime)s:%(levelname)s:%(message)s',filename=logging_path,level=logging.ERROR,datefmt='%Y-%m-%d %H:%M:%S') #DEBUG,INFO,WARNING,ERROR,CRITICAL
 	urllib3_log = logging.getLogger("urllib3") #ignoring informational logging from called modules (rest calls in this case) https://stackoverflow.com/questions/24344045/how-can-i-completely-remove-any-logging-from-requests-module-in-python
 	urllib3_log.setLevel(logging.CRITICAL) 
@@ -879,18 +882,11 @@ if __name__ == "__main__":
 	t_mqtt = threading.Thread(target=mqttc.loop_forever) #define a thread to run MQTT connection
 	t_mqtt.start() #Start connection to MQTT in thread so non-blocking 
 	
-	### WebSocket Connection. Must be in main to be referenced from other functions like ws.send 
-	ws_header = {'Authorization': 'Basic {0}','ClientID': 'UniPI'}
-	ws_protocol = 'ws' #wss if secure
-	ws_url = (ws_protocol + "://" + ws_server + "/ws")
-	ws = websocket.WebSocketApp("ws://" + ws_server + "/ws",# header=ws_header,
-							on_open = on_ws_open,
-							on_message = on_ws_message,
-							on_error = on_ws_error,
-							on_close = on_ws_close)
-							### WebSocket to connect to the broker, subscribe to messages (optional) and loop this forever in a thread so non-blocking				
-	t_ws = threading.Thread(target=ws.run_forever)
-	t_ws.start() #Start connection to WebSocket in thread so non-blocking	
+	### WebSocket listener Connection. Must be in main to be referenced from other functions like ws.send, so we handle this differently since I moved this to a function. 
+	# start a function so we can reconnect on disconnect (like EVOK upgrade or network outage) every 5 seconds
+	# starts in a seperate thread to not block anything
+	create_ws();
 
 	### Time function so we're not dependent of incomming commands to trigger things
+	### https://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds
 	threading.Thread(target=lambda: every(1, off_commands)).start()
