@@ -4,7 +4,7 @@
 # No fancy coding to see here, please move on (Build by a complete amateur ;-) )
 # Matthijs van den Berg / https://github.com/matthijsberg/unipi-mqtt
 # MIT License
-# version 11.2020  (new version numbering since that's really face these days)
+# version 11.2020.1  (new version numbering since that's really face these days)
 
 # resources used besides google;
 # - http://jasonbrazeal.com/blog/how-to-build-a-simple-iot-system-with-python/
@@ -812,15 +812,13 @@ def create_ws():
 				on_open = on_ws_open,
 				on_message = on_ws_message,
 				on_error = on_ws_error,
-				on_close = on_ws_close)
-				### WebSocket to connect to the broker, subscribe to messages (optional) and loop this forever in a thread so non-blocking				
-			t_ws = threading.Thread(target=ws.run_forever(skip_utf8_validation=True,ping_interval=10,ping_timeout=8))
-			t_ws.start() #Start connection to WebSocket in thread so non-blocking	
+				on_close = on_ws_close)				
+			ws.run_forever(skip_utf8_validation=True,ping_interval=10,ping_timeout=8) # open websocket connection
 		except Exception as e:
 			gc.collect()
 			logging.error("Websocket connection Error  : {0}".format(e))					
 		logging.error("Reconnecting websocket  after 5 sec")
-		time.sleep(5)
+		time.sleep(5) #sleep to prevent setting up many connections / sec.
 
 def on_ws_open(ws):
 	logging.error('{}: WebSockets connection is starting in a separate thread!'.format(get_function_name()))
@@ -829,8 +827,6 @@ def on_ws_open(ws):
 	
 def on_ws_message(ws, message):
 	ws_sanity_check(message) #This is starting the main message handling for UniPi originating messages
-	#print(ws)
-	#print(message)
 
 def on_ws_close(ws):
 	logging.critical('{}: WEBSOCKETS CONNECTION CLOSED - THIS WILL PREVENT UNIPI INITIATED ACTIONS FROM RUNNING!'.format(get_function_name()))
@@ -885,7 +881,8 @@ if __name__ == "__main__":
 	### WebSocket listener Connection. Must be in main to be referenced from other functions like ws.send, so we handle this differently since I moved this to a function. 
 	# start a function so we can reconnect on disconnect (like EVOK upgrade or network outage) every 5 seconds
 	# starts in a seperate thread to not block anything
-	create_ws();
+	t_websocket = threading.Thread(target=create_ws) #define a thread to run MQTT connection
+	t_websocket.start() #Start connection to MQTT in thread so non-blocking 
 
 	### Time function so we're not dependent of incomming commands to trigger things
 	### https://stackoverflow.com/questions/474528/what-is-the-best-way-to-repeatedly-execute-a-function-every-x-seconds
