@@ -252,21 +252,13 @@ Example for dimmable light (publish from HASS to UniPi to turn on an output)
 
 # Change log
 
-### Version 0.1
-Initial release and documentation in this readme file
-
-### Version 0.2
+### version 11.2020 (the "Stijn" release)
 Changes:
- - Changed handling if DI devices with delay to no longer use previous state for rest of devices, cleaned up json config file. Should fix a bug that crashed the script on certain ON / OFF actions.
- - Implemented a "frist run" part to set MQTT messages at script start to reflect actual status of inputs, not last known status maintained in MQTT broker or no status at al. 
- - tested UART (extension module) and that works. Changed config file with example
-
-### Version 0.3
-Changes:
- - Changed the thread part so threading and especially the stop thread part now works correctly
- - Changed the MQTT send part to make sure that on a handle local action only 1 message is send (was 4). Now works nicely
- - Revamped the threaded function like duration and transition to be interuptable
- - Changed code for the 1 wire devices. Upgrade of Evok changed the naming convention for those devices from "temp" to "1wire". Now handled again.
+ - New version numbering since that's really cool
+ - Made WebSockets listener re-connect on disconnect (like a service interruption of evok) every 5 seconds
+ - implemented authentication for MQTT since that is a requirement for HA now
+ - adjusted some timeouts to make a external realy work via the bel function
+ - Changed the unipi_mqtt.service file to restart a service if the script fails for enhanced resillience
 
 ### Version 0.4
 Changes:
@@ -277,12 +269,27 @@ Changes:
  - Changed a bug in unipython.py where switch status for on / off was the wrong way around.
  - 0.41 has a small fix to honor the "level" information in unipi_mqtt_config for handle local dimmmers.
 
+### Version 0.3
+Changes:
+ - Changed the thread part so threading and especially the stop thread part now works correctly
+ - Changed the MQTT send part to make sure that on a handle local action only 1 message is send (was 4). Now works nicely
+ - Revamped the threaded function like duration and transition to be interuptable
+ - Changed code for the 1 wire devices. Upgrade of Evok changed the naming convention for those devices from "temp" to "1wire". Now handled again.
+
+### Version 0.2
+Changes:
+ - Changed handling if DI devices with delay to no longer use previous state for rest of devices, cleaned up json config file. Should fix a bug that crashed the script on certain ON / OFF actions.
+ - Implemented a "frist run" part to set MQTT messages at script start to reflect actual status of inputs, not last known status maintained in MQTT broker or no status at al. 
+ - tested UART (extension module) and that works. Changed config file with example
+
+### Version 0.1
+Initial release and documentation in this readme file
+
 ## ToDo
   - Something with certificates
   - Use config file for client part too?
   - clean up code more
   - many other yet to discover things.
-  - make websocket reconnect on disconnect
 
 # Test info
 
