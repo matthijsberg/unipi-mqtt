@@ -379,7 +379,7 @@ def dev_modbus(message_dev):
 				mqtt_set_temp(config_dev['state_topic'],temperature)
 			elif config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "temp" and message_dev['typ'] == "DS2438":
 				temperature = float(message_dev['temp'])
-				if 0 <= temperature <= 50:
+				if -50 <= temperature <= 70:
 					temperature = round(temperature,1)
 					mqtt_set_temp(config_dev['state_topic'],temperature)
 			elif config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "humidity" and message_dev['typ'] == "DS2438":
