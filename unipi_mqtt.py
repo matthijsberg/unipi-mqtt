@@ -24,7 +24,7 @@ import websocket
 from websocket import create_connection
 import traceback
 from collections import OrderedDict
-from statistics import mean, median
+import statistics
 import math
 # from hanging_threads import start_monitoring
 
@@ -44,8 +44,9 @@ ws_user = "none" #not implemented auth for ws yet
 ws_pass = "none"
 # Generic Variables
 logging_path = "/var/log/unipi_mqtt.log"
-interval = 29 #realtime data sampling interval (for ais that report every second) to reduce updates to bus and rest API, TODO to fix to more elegant solution.
 dThreads = {} #keeping track of all threads running
+intervals_average = {} #dict that we fill with and array per sensors that needs an average value. Number of values in array is based on "interval" var in config file
+intervals_counter = {} #counter to use per device in dict so we know when to stop. :-) global since it iterates and this was the best I could come up with. 
 
 ########################################################################################################################
 ###                     Some housekeeping functions to handle threads, logging, etc.                                 ###
@@ -353,18 +354,22 @@ def dev_ai(message_dev):
 # Function to handle Analoge Inputs from WebSocket (UniPi), mainly focussed on LUX from analoge input now. using a sample rate to reduce rest calls to domotics
 	for config_dev in devdes:
 		if config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "ai":
-			#print(round(message_dev['value'],3))
-			config_dev['unipi_avg_cntr']
-			if config_dev['unipi_avg_cntr'] <= interval:
-				cntr=config_dev['unipi_avg_cntr']
-				config_dev['unipi_prev_value'][cntr] = round(message_dev['value'],2)
-				config_dev['unipi_avg_cntr'] += 1
+			int_presence = 'interval' in config_dev #check to see if "interval" in config. If not throw an error. If you want to disable average, set to 0.
+			if (int_presence == True):
+				cntr = intervals_counter[config_dev['dev']+config_dev['circuit']]
+				if cntr <= config_dev['interval']:
+					intervals_average[config_dev['dev']+config_dev['circuit']][cntr] = float(round(message_dev['value'],3))
+					intervals_counter[config_dev['dev']+config_dev['circuit']] += 1
+				else:
+					# write LUX to MQTT here.
+					lux = int(round((statistics.mean(intervals_average[config_dev['dev']+config_dev['circuit']])*200),0))
+					mqtt_set_lux(config_dev['state_topic'],lux)
+					config_dev['unipi_avg_cntr'] = 0
+					logging.debug('PING Received WebSocket data and collected 30 samples of lux data : {}'.format(message_dev)) #we're loosing websocket connection, debug
+					intervals_counter[config_dev['dev']+config_dev['circuit']] = 0
 			else:
-				# write LUX to MQTT here.
-				lux = str(round((mean(config_dev['unipi_prev_value'])*200),0))
-				mqtt_set_lux(config_dev['state_topic'],lux)
-				config_dev['unipi_avg_cntr'] = 0
-				logging.debug('PING Received WebSocket data and collected 30 samples of lux data : {}'.format(message_dev)) #we're loosing websocket connection, debug
+				logging.error('{}: CONFIG ERROR : 1-WIRE sensor "{}" is missing "interval" in config file. Set to 0 to disable or set sampling rate with a higher value.'.format(get_function_name(),message_dev))
+
 
 def dev_relay(message_dev):
 	pass #still need to figure out what to do with this. RELAYS ARE HANDLED AS OUTPUT.
@@ -373,33 +378,70 @@ def dev_modbus(message_dev):
 # Function to handle Analoge Inputs from WebSocket (UniPi), mainly focussed on LUX from analoge input now. using a sample rate to reduce MQTT massages. TODO needs to be improved!
 	for config_dev in devdes:
 		try:
-			if config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "temp" and message_dev['typ'] == "DS18B20":
-				temperature = float(message_dev['value'])
-				temperature = round(temperature,1)
-				mqtt_set_temp(config_dev['state_topic'],temperature)
-			elif config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "temp" and message_dev['typ'] == "DS2438":
-				temperature = float(message_dev['temp'])
-				if -50 <= temperature <= 70:
-					temperature = round(temperature,1)
-					mqtt_set_temp(config_dev['state_topic'],temperature)
-			elif config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "humidity" and message_dev['typ'] == "DS2438":
-				humidity = float(message_dev['humidity'])
-				if 0 <= humidity <= 100:
-					humidity = round(humidity,1)
-					mqtt_set_humi(config_dev['state_topic'],humidity)
+			if (config_dev['circuit'] == message_dev['circuit'] and (config_dev['dev'] == "temp" or config_dev['dev'] == "humidity" or config_dev['dev'] == "light")):
+				int_presence = 'interval' in config_dev #check to see if "interval" in config. If not throw an error. If you want to disable average, set to 0.
+				if int_presence == True:
+					cntr = intervals_counter[config_dev['dev']+config_dev['circuit']]
+					#config for 1-wire temperature sensors intervals_average[config_dev['dev']+config_dev['circuit']]
+					if config_dev['dev'] == "temp":
+						if cntr <= config_dev['interval']:
+							if message_dev['typ'] == "DS18B20":
+								if -55 <= float(message_dev['value']) <= 125: #sensor should be able to do -55 to +125 celcius
+									intervals_average[config_dev['dev']+config_dev['circuit']][cntr] = float(message_dev['value'])
+									intervals_counter[config_dev['dev']+config_dev['circuit']] += 1
+								else:
+									logging.error('{}: Message "{}" is out of range, temp smaller than -55 or larger than 125.'.format(get_function_name(),message_dev))
+							elif message_dev['typ'] == "DS2438":
+								if -55 <= float(message_dev['temp']) <= 125: #sensor should be able to do -55 to +125 celcius
+									intervals_average[config_dev['dev']+config_dev['circuit']][cntr] = float(message_dev['temp'])
+									intervals_counter[config_dev['dev']+config_dev['circuit']] += 1
+								else:
+									logging.error('{}: Message "{}" is out of range, temp smaller than -55 or larger than 125.'.format(get_function_name(),message_dev))
+							else:
+								logging.error('{}: Unknown Device sensor type {} in config'.format(get_function_name(),message_dev['typ']))
+						else:
+							avg_temperature = statistics.mean(intervals_average[config_dev['dev']+config_dev['circuit']])
+							avg_temperature = round(avg_temperature,1)
+							mqtt_set_temp(config_dev['state_topic'],avg_temperature)
+							intervals_counter[config_dev['dev']+config_dev['circuit']] = 0
+					#config for 1-wire humidity sensors
+					elif config_dev['dev'] == "humidity":
+						if cntr <= config_dev['interval']:
+							if message_dev['typ'] == "DS2438":
+								if 0 <= float(message_dev['humidity']) <= 100:
+									intervals_average[config_dev['dev']+config_dev['circuit']][cntr] = float(round(message_dev['humidity'],1))
+									intervals_counter[config_dev['dev']+config_dev['circuit']] += 1
+								else:
+									logging.error('{}: Message "{}" is out of range, humidity smaller or larger than 100.'.format(get_function_name(),message_dev))
+							else:
+								logging.error('{}: Unknown Device sensor type {} in config'.format(get_function_name(),message_dev['typ']))
+						else:
+							avg_humidity = float(statistics.mean(intervals_average[config_dev['dev']+config_dev['circuit']]))
+							avg_humidity = round(avg_humidity,1)
+							mqtt_set_humi(config_dev['state_topic'],avg_humidity)
+							intervals_counter[config_dev['dev']+config_dev['circuit']] = 0
+					#config for 1-wire light / lux sensors
+					elif config_dev['dev'] == "light":
+						if cntr <= config_dev['interval']:
+							if message_dev['typ'] == "DS2438":
+								if 0 <= float(message_dev['vis']) <= 0.25:
+									intervals_average[config_dev['dev']+config_dev['circuit']][cntr] = float(round(message_dev['vis'],1))
+									intervals_counter[config_dev['dev']+config_dev['circuit']] += 1
+								else:
+									logging.error('{}: Message "{}" is out of range, humidity smaller or larger than 100.'.format(get_function_name(),message_dev))
+							else:
+								logging.error('{}: Unknown Device sensor type {} in config'.format(get_function_name(),message_dev['typ']))
+						else:
+							avg_illumination = float(statistics.mean(intervals_average[config_dev['dev']+config_dev['circuit']]))
+							if avg_illumination < 0:
+								avg_illumination = 0 # sometimes I see negative values that would make no sense, make that a 0
+							# try to match this with LUX from other sensors, 0 to 2000 LUX so need to calculate from 0 to 0.25 volt to match that. TODO is 2000 LUX = 0.25 or more?
+							avg_illumination = avg_illumination*8000
+							avg_illumination = round(avg_illumination,0)
+							mqtt_set_lux(config_dev['state_topic'],avg_illumination)					
+							intervals_counter[config_dev['dev']+config_dev['circuit']] = 0
 				else:
-					logging.error('Message "{}" is out of range, humidity larger than 100.'.format(message_dev))
-			elif config_dev['circuit'] == message_dev['circuit'] and config_dev['dev'] == "light" and message_dev['typ'] == "DS2438":
-				light = float(message_dev['vis'])
-				if light < 0:
-					light = 0 # sometimes I see negative values that would make no sense, make that a 0
-				if 0 <= light <= 0.25:
-					# try to match this with LUX from other sensors, 0 to 2000 LUX so need to calculate from 0 to 0.25 volt to match that. TODO is 2000 LUX = 0.25 or more?
-					light = light*8000
-					light = round(light,0)
-					mqtt_set_lux(config_dev['state_topic'],light)
-				else:
-					logging.error('Message "{}" is out of range, light ("vis") larger than 0.25 (Volts).'.format(message_dev))
+					logging.error('{}: CONFIG ERROR : 1-WIRE sensor "{}" is missing "interval" in config file. Set to 0 to disable or set sampling rate with a higher value.'.format(get_function_name(),message_dev))
 		except ValueError as e:
 			logging.error('Message "{}" not a valid JSON - message not processed, error is "{}".'.format(message_dev,e))
 
@@ -522,6 +564,7 @@ def transition_brightness(desired_brightness,trans_time,dev,circuit,topic,messag
 	trans_step = round(float(trans_time)/100,3)								# determine time per step for 100 steps. Fix for 100 so dimming is always the same speed, independent of from and to levels
 	current_level = unipy.get_circuit(dev,circuit)							# get current circuit level from unipi REST
 	desired_level = round(float(desired_brightness) / 25.5,1)				# calc desired level to 1/100 in stead of 256 steps for 0-10 volts
+	print(current_level['value'])
 	delta_level = (desired_level - current_level['value'])					# determine delta based on from and to levels
 	number_steps = abs(round(delta_level*10,0))								# determine number of steps based on from and to level
 	new_level = current_level['value']
@@ -636,26 +679,34 @@ def dev_switch_off(mqtt_topic):
 	logging.info('{}: Set OFF for MQTT topic: "{}".'.format(get_function_name(),mqtt_topic))
 	
 def mqtt_set_lux(mqtt_topic, lux):
-	# MQTT only
-	send_msg = {
-        "lux": lux
-	}
-	mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
-	logging.info('{}: Set LUX: {} for MQTT topic: "{}" .'.format(get_function_name(),lux,mqtt_topic))
+	try:
+		send_msg = {
+	        "lux": lux
+		}
+		mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
+		logging.info('{}: Set LUX: {} for MQTT topic: "{}" .'.format(get_function_name(),lux,mqtt_topic))
+	except:
+		logging.error('{}: An error has occurred sending "{}" C for MQTT topic: "{}" .'.format(get_function_name(),temp,mqtt_topic))
 
 def mqtt_set_temp(mqtt_topic, temp):
-	send_msg = {
-        "temperature": temp
-	}
-	mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
-	logging.info('{}: Set temperature: {} C for MQTT topic: "{}" .'.format(get_function_name(),temp,mqtt_topic))
+	try:
+		send_msg = {
+	        "temperature": temp
+		}
+		mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
+		logging.info('{}: Set temperature: {} C for MQTT topic: "{}" .'.format(get_function_name(),temp,mqtt_topic))
+	except:
+		logging.error('{}: An error has occurred sending "{}" C for MQTT topic: "{}" .'.format(get_function_name(),temp,mqtt_topic))
 
 def mqtt_set_humi(mqtt_topic, humi):
-	send_msg = {
-        "humidity": humi
-	}
-	mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
-	logging.info('{}: Set humidity: {} for MQTT topic: "{}" .'.format(get_function_name(),humi,mqtt_topic))
+	try:
+		send_msg = {
+	        "humidity": humi
+		}
+		mqttc.publish(mqtt_topic, payload=json.dumps(send_msg), qos=1, retain=False)
+		logging.info('{}: Set humidity: {} for MQTT topic: "{}" .'.format(get_function_name(),humi,mqtt_topic))
+	except:
+		logging.error('{}: An error has occurred sending "{}" C for MQTT topic: "{}" .'.format(get_function_name(),temp,mqtt_topic))
 
 def mqtt_set_counter(mqtt_topic,counter,delta): #published an MQTT message with a counter delta based on the interval defined or between de messages received. Messages from webdav might not trigger every pulse.
 	logging.debug('Hit Functions {}'.format(get_function_name()))
@@ -827,6 +878,8 @@ def on_ws_open(ws):
 	
 def on_ws_message(ws, message):
 	ws_sanity_check(message) #This is starting the main message handling for UniPi originating messages
+	#print(ws)
+	#print(message)
 
 def on_ws_close(ws):
 	logging.critical('{}: WEBSOCKETS CONNECTION CLOSED - THIS WILL PREVENT UNIPI INITIATED ACTIONS FROM RUNNING!'.format(get_function_name()))
@@ -849,7 +902,15 @@ def firstrun():
 			ws_sanity_check(message)
 		except:
 			logging.error('{}: Input error in first run, message received is ERROR {} on dev: {} and circuit: {}. Please ignore if dev humidity or light'.format(get_function_name(),message,config_dev['dev'],config_dev['circuit']))
-			#Note first run will also find dev = humidity, etc. but cannot match that to a get to unipi and the creates arror 500, however the humidity is already handled on topic "temp" as humidity is not a deice class. Maybe oneday clean this up by changing dev types and something like sub_dev, but works like a charm this way too. 
+			#Note first run will also find dev = humidity, etc. but cannot match that to a get to unipi and the creates arror 500, however the humidity is already handled on topic "temp" as humidity is not a device class. Maybe oneday clean this up by changing dev types and something like sub_dev, but works like a charm this way too. 
+		# Pre-empt the dicts with values and an array to fill in the counter values and sensor values to calculate an average value for sensors. 
+		# We only do this for sensors where we find "interval" in the configuration file. Since we start with 0, 0=1, 1=2, etc.
+		int_presence = 'interval' in config_dev
+		if (int_presence == True):
+			global intervals_average
+			global intervals_counter
+			intervals_average[(config_dev['dev']+config_dev['circuit'])] = [0.0] * (config_dev['interval'] + 1)
+			intervals_counter[(config_dev['dev']+config_dev['circuit'])] = 0
 		
 ### MAIN FUNCTION
 
