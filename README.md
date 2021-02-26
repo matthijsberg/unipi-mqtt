@@ -34,6 +34,8 @@ Setup:
 
 A config file is used to describe to inputs on the UniPi so the script knows what to send out when a change on a input is detected. An example config file is in the repo, here an example entry. It's JSON, so make sure it's valid. 
 
+### Digital In as binary sensor in HA
+
 Example PIR sensor for motion detection in unipi_mqtt_config.json:
 ```json
    {
@@ -64,10 +66,10 @@ The HA part for this is a binary sensor:
   device_class: presence
 ```
 
-### 3 Handle local options
-Example unipi_mqtt_config.json with "handle local" function to handle a local "critical" function within the script so it works without HA or other MQTT connections. 
+### Handle local options (3 types)
+Example unipi_mqtt_config.json with "handle local" function to handle a local "critical" function within the script so it works without HA or other MQTT connections. This also sends MQTT messages to inform HA about the state change.
 
-#### Handle Local Bel (on AND off switch of relay in 1 action)
+#### 1 - Handle Local Bel (on AND off switch of relay in 1 action)
 This example rings a bel 3 time (or switches a realy 3 x on and off, so 6 total actions). The bel I use is a Friendland bel on 12 or 24 volt. It rings once on power on and power off (power on pulls the ring stick, power off launches it to ring quite loud). 
 
 ```json
@@ -101,7 +103,7 @@ I trigger this in HA from a automation where the action part is;
         payload: '{"circuit": "2_01", "dev": "relay", "repeat": "1", "state": "pulse"}'
 ```
 
-#### Handle Local Light Dimmer (Analog output 0-10 volt).
+#### 2 - Handle Local Light Dimmer (Analog output 0-10 volt).
 Example unipi_mqtt_config.json of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source). I user 0-10 volt (not 1-10!) led dimmers. Works flawlessly. Note that the Level in unipi = 0-10 and in HA 0-255 for 0-100%. Not that handle local sets a value, but it's static. Things like holding the sensor to dimm are not implemented.
 
 unipi_mqtt_config.json:
@@ -153,7 +155,7 @@ The HA part can look like:
   qos: 0
 ```
 
-#### Handle Local Switch (output or relayoutput toggle)
+#### 3 - Handle Local Switch (output or relayoutput toggle)
 Example unipi_mqtt_config.json of handle local switch (on / off only, relay or digital output used to switch a device or powersource to a device).
 It will poll the unipi box and toggle the output to the other state. So on becomes off and visa versa. A MQTT message reflecting this is send. HA need to have the some topic and payload to recognise a change in the HA GUI.
 
@@ -189,7 +191,7 @@ The HA part of this switch looks like (for me under lights in YAML):
   qos: 0
 ```
 
-#### 1-Wire sensors
+### 1-Wire sensors
 You can connect 1-wire sensors to the Unipi (16 cascaded sensors to 1 1-wire port). The sensors allow you to measure things like temperature and humidity. The implementation currently support sensors with model `DS2438` and `DS18B20`. Other might work, but I just don't have them and the script hard-checks for those models. So let me know if you need a change / add here. This info can be found in the UniPi API (exmp. http://192.168.1.125:8080/rest/sensor/28D1EFB708025352 ) The value for "circuit" can be found in the web GUI of the UNiPi.
 
 Config in unipi_mqtt the config file
@@ -230,22 +232,9 @@ NOTE: the `force_update: true` is used to always update the sensor. Home Assista
  - interval: value for 1-wire sensors and analog inputs to create an avarage based on this number of readings and send this avg out.
  
 
-## HASSIO Config
+## MQTT messages to change UniPi Outputs
+You can send MQTT message to the Unipi box over MQTT to switch outputs. This does not require a config entry on the unipi since we're sending the device and circuit information in the MQTT message that is handled by the script.
 
-Example for sensor (from UniPi input to HASSIO)
-```
-- platform: mqtt
-  name: "Kantoor Motion"
-  state_topic: "unipi/bgg/kantoor/motion"
-  payload_on: "ON"
-  payload_off: "OFF"
-  availability_topic: "unipi/bgg/kantoor/motion/available"
-  payload_available: "online"
-  payload_not_available: "offline"
-  qos: 0
-  device_class: presence
-  #retain: true
-```  
 Example for dimmable light (publish from HASS to UniPi to turn on an output)
 ```
 - platform: mqtt
@@ -277,6 +266,25 @@ Example for dimmable light (publish from HASS to UniPi to turn on an output)
   brightness_template: '{{ value_json.brightness }}'
   qos: 0
 ```
+
+Switch a relay:
+```
+- platform: mqtt
+  schema: template
+  name: "Test Relay 2_02"
+  unique_id: "test_relay_2_02"
+  state_topic: "unipi1/bgg/meterkast/testrelay"
+  command_topic: "unipi1/bgg/meterkast/testrelay/set"
+  payload_available: "online"
+  payload_not_available: "offline"
+  command_on_template: '{"state": "on", "circuit": "2_02", "dev": "output"}'
+  command_off_template: '{"state": "off", "circuit": "2_02", "dev": "output"}'
+  state_template: "{{ value_json.state }}"
+  qos: 0
+```
+
+I the device remains offline you need to take out the availability topic line to let HA not check that. 
+
 
 # Change log
 
