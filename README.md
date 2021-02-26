@@ -102,7 +102,7 @@ I trigger this in HA from a automation where the action part is;
 ```
 
 #### Handle Local Light Dimmer (Analog output 0-10 volt).
-Example unipi_mqtt_config.json of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source). I user 0-10 volt (not 1-10!) led dimmers. Works flawlessly. Note that the Level in unipi = 0-10 and in HA 0-255 for 0-100%. 
+Example unipi_mqtt_config.json of a handle local switch with dimmer (analog output 0-10 volt is used to dimm led source). I user 0-10 volt (not 1-10!) led dimmers. Works flawlessly. Note that the Level in unipi = 0-10 and in HA 0-255 for 0-100%. Not that handle local sets a value, but it's static. Things like holding the sensor to dimm are not implemented.
 
 unipi_mqtt_config.json:
 
@@ -189,6 +189,33 @@ The HA part of this switch looks like (for me under lights in YAML):
   qos: 0
 ```
 
+#### 1-Wire sensors
+You can connect 1-wire sensors to the Unipi (16 cascaded sensors to 1 1-wire port). The sensors allow you to measure things like temperature and humidity. The implementation currently support sensors with model `DS2438` and `DS18B20`. Other might work, but I just don't have them and the script hard-checks for those models. So let me know if you need a change / add here. This info can be found in the UniPi API (exmp. http://192.168.1.125:8080/rest/sensor/28D1EFB708025352 ) The value for "circuit" can be found in the web GUI of the UNiPi.
+
+Config in unipi_mqtt the config file
+```
+"circuit":"28D1EFB708025352",
+"description":"Temperatuur Sensor buiten",
+"dev":"temp",
+"interval":19,
+"state_topic":"unipi/buiten/voordeur/temperatuur"
+```
+
+"dev" value options are `"temp"`, `"humidity"` or `"light"`.
+
+Config in HA sensors part:
+```
+- platform: mqtt
+  name: "Buiten Temperatuur"
+  unique_id: "buiten_temperatuur"
+  state_topic: "unipi/buiten/voordeur/temperatuur"
+  unit_of_measurement: "°C"
+  value_template: "{{value_json.temperature}}"
+  force_update: true
+```
+
+NOTE: the `force_update: true` is used to always update the sensor. Home Assistant by default does NOT updates sensor values if they, compared to the latest value, are unchanged. This is optional. Since I run a script to monitor my unipi device based on a regular update (if > 10 min no update = alart) of this value I want it to always update.
+
 ## Description of the fields:
  - dev: The input device type on the UniPi
  - circuit: The input circuit on the UniPi
@@ -200,6 +227,7 @@ The HA part of this switch looks like (for me under lights in YAML):
  - unipi_prev_value_timstamp: when was the last status change. Used for delay based off messages, for exmpl. for PIR pulse
  - state_topic: MQTT state topic to send message on
  - handle_local: Use to switch outputs based on a input directly. So no dependency on MQTT broker or HASSIO. Use this for bel and light switches. Does send a MQTT update message to status can change in Home Assistant.
+ - interval: value for 1-wire sensors and analog inputs to create an avarage based on this number of readings and send this avg out.
  
 
 ## HASSIO Config
@@ -251,6 +279,11 @@ Example for dimmable light (publish from HASS to UniPi to turn on an output)
 ```
 
 # Change log
+
+### version 02.2021.1 ("the average" release)
+Changes:
+ - the 1-wire implementation did not use the average setting. Rewrote the 1-wire part for temp and humidity sensors. You can now add a "interval" variable that counts creates an average. "interval" is the number or readings. Note that 1-wire readings are approx. once every 3 seconds and 0 is the first value so a seeeting of 19 = 20 values. This allows you to greatly reduce the number of updates HA has to handle when the sensors count builds. :-)
+ - The same average sytems is used for LUX value based on an anolog input (I know, rather specific). 
 
 ### version 11.2020 (the "Stijn" release)
 Changes:
