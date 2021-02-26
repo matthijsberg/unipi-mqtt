@@ -4,7 +4,7 @@
 # No fancy coding to see here, please move on (Build by a complete amateur ;-) )
 # Matthijs van den Berg / https://github.com/matthijsberg/unipi-mqtt
 # MIT License
-# version 11.2020.1  (new version numbering since that's really face these days)
+# version 02.2021.1  (new version numbering since that's really face these days)
 
 # resources used besides google;
 # - http://jasonbrazeal.com/blog/how-to-build-a-simple-iot-system-with-python/
