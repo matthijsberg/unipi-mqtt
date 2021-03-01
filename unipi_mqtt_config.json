@@ -10,46 +10,6 @@
       "state_topic": "unipi/bgg/hal/motion"
    },
    {
-      "circuit":"1_02",
-      "description":"Woonkamer PIR",
-      "dev":"input",
-      "device_delay":120,
-      "device_normal":"no",
-      "unipi_value":0,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bgg/woonkamer/motion"
-   },
-   {
-      "circuit":"1_03",
-      "description":"Serre PIR",
-      "dev":"input",
-      "device_delay":30,
-      "device_normal":"no",
-      "unipi_value":0,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bgg/serre/motion"
-   },
-   {
-      "circuit":"1_04",
-      "description":"Kantoor PIR",
-      "dev":"input",
-      "device_delay":120,
-      "device_normal":"no",
-      "unipi_value":0,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bgg/kantoor/motion"
-   },
-   {
-      "circuit":"2_01",
-      "description":"Achterdeur PIR",
-      "dev":"input",
-      "device_delay":30,
-      "device_normal":"no",
-      "unipi_value":0,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bgg/achterdeur/motion"
-   },
-   {
       "circuit":"2_02",
       "description":"Achterdeur Beldrukker",
       "dev":"input",
@@ -73,79 +33,6 @@
       "state_topic": "unipi/bgg/achterdeur/contact"
    },
    {
-      "circuit":"2_04",
-      "description":"Voordeur PIR",
-      "dev":"input",
-      "device_delay":30,
-      "device_normal":"no",
-      "unipi_value":0,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bgg/voordeur/motion"
-   },
-   {
-      "circuit":"2_05",
-      "description":"Voordeur Beldrukker",
-      "dev":"input",
-      "handle_local":
-            {
-	            "type": "bel",
-				"trigger":"on",
-				"rings": 3,
-				"output_dev": "output",
-				"output_circuit": "2_01"
-			},
-      "device_delay":0,
-      "device_normal":"no",
-      "state_topic": "unipi/bgg/voordeur/beldrukker"
-   },
-   {
-      "circuit":"2_06",
-      "description":"Voordeur Contact",
-      "dev":"input",
-      "device_normal":"nc",
-      "state_topic": "unipi/bgg/voordeur/contact"
-   },
-   {
-      "circuit":"3_01",
-      "description":"Dakraam Contact",
-      "dev":"input",
-      "device_normal":"nc",
-      "state_topic": "unipi/bbg/bijkeuken/dakraam/contact"
-   },
-   {
-      "circuit":"3_02",
-      "description":"Schakelaar Bijkeuken Licht",
-      "dev":"input",
-      "handle_local":
-            {
-	            "type": "dimmer",
-	            "output_dev": "analogoutput",
-				"output_circuit": "2_03",
-				"level": 10
-			},
-      "device_normal":"no",
-      "state_topic": "homeassistant/bgg/bijkeuken/licht"
-   },
-   {
-      "circuit":"3_03",
-      "description":"Bijkeuken PIR",
-      "dev":"input",
-      "device_delay":30,
-      "device_normal":"no",
-      "unipi_value":0,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bgg/bijkeuken/motion"
-   },
-   {
-      "circuit":"3_04",
-      "description":"Tussendeur Contact",
-      "dev":"input",
-      "device_normal":"nc",
-      "unipi_value":1,
-      "unipi_prev_value_timstamp":0,
-      "state_topic": "unipi/bbg/bijkeuken/tussendeur/contact"
-   },
-   {
       "circuit":"3_05",
       "description":"Schakelaar Achterdeur Licht",
       "dev":"input",
@@ -157,7 +44,7 @@
 				"level": 10
 			},
       "device_normal":"no",
-      "state_topic": "homeassistant/buiten/achterdeur/licht"
+      "state_topic": "unipi1/buiten/achterdeur/licht"
    },
    {
       "circuit":"3_06",
@@ -166,16 +53,9 @@
       "device_normal":"no",
       "state_topic": "unipi/bgg/achter/buitenlichtschakelaar"
    },
-   {
-      "circuit":"UART_4_4_01",
-      "description":"Kantoorraam Contact",
-      "dev":"input",
-      "device_normal":"nc",
-      "state_topic": "unipi/bbg/kantoor/raam/contact"
-   },
-   {
+    {
       "circuit":"UART_4_4_02",
-      "description":"Watermeter",
+      "description":"Watermeter Pulse Counter",
       "dev":"input",
       "device_type":"counter",
       "unipi_value":0,
@@ -185,103 +65,48 @@
       "unipi_prev_value_timstamp":0,
       "state_topic": "unipi/huis/watermeter"
    },
-   {
-      "circuit":"UART_4_4_03",
-      "description":"Schakelaar Woonkamer Nis Licht",
-      "dev":"input",
-      "handle_local":
-         {
-	         "type": "dimmer",
-	         "output_dev": "analogoutput",
-			 "output_circuit": "2_04",
-			 "level": 5
-			},
-      "device_normal":"no",
-      "state_topic": "homeassistant/bgg/woonkamer/nis/licht"
-   },
-   {
+     {
       "circuit":"UART_4_4_04",
-      "description":"TEST IN FUTURE Schakelaar Woonkamer Eker Licht",
+      "description":"Schakelaar Woonkamer Eker Licht",
       "dev":"input",
       "handle_local":
         {
-	        "type": "switch",
-	        "output_dev": "output",
-			"output_circuit": "2_02"
+	         "type": "dimmer",
+	         "output_dev": "analogoutput",
+			 "output_circuit": "3_01",
+			 "level": 5
 		},
       "device_normal":"no",
-      "state_topic": "homeassistant/bgg/meterkast/testrelay"
+      "state_topic": "unipi1/bgg/woonkamer/erker/licht"
    },
    {
       "circuit":"1_01",
       "description":"Hal LUX",
       "dev":"ai",
       "device_normal":"no",
-      "unipi_prev_value":[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29 ],
-      "unipi_avg_cntr":0,
+      "interval":60,
       "state_topic": "unipi/bgg/hal/lux"
    },
-   {
-      "circuit":"2_01",
-      "description":"Woonkamer LUX",
-      "dev":"ai",
-      "device_normal":"no",
-      "unipi_prev_value":[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29 ],
-      "unipi_avg_cntr":0,
-      "state_topic": "unipi/bgg/woonkamer/lux"
-   },
-   {
-      "circuit":"2_02",
-      "description":"Sere LUX",
-      "dev":"ai",
-      "device_normal":"no",
-      "unipi_prev_value":[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29 ],
-      "unipi_avg_cntr":0,
-      "state_topic": "unipi/bgg/serre/lux"
-   },
-   {
-      "circuit":"3_01",
-      "description":"Kantoor LUX",
-      "dev":"ai",
-      "device_normal":"no",
-      "unipi_prev_value":[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29 ],
-      "unipi_avg_cntr":0,
-      "state_topic": "unipi/bgg/kantoor/lux"
-   },
-   {
-      "circuit":"2_03",
-      "description":"Achterdeur LUX",
-      "dev":"ai",
-      "device_normal":"no",
-      "unipi_prev_value":[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29 ],
-      "unipi_avg_cntr":0,
-      "state_topic": "unipi/bgg/achterdeur/lux"
-   },
-   {
-      "circuit":"2_04",
-      "description":"Bijkeuken LUX",
-      "dev":"ai",
-      "device_normal":"no",
-      "unipi_prev_value":[ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29 ],
-      "unipi_avg_cntr":0,
-      "state_topic": "unipi/bgg/bijkeuken/lux"
-   },
+   
    {
       "circuit":"28D1EFA708000052",
       "description":"Temperatuur Sensor buiten",
       "dev":"temp",
+      "interval":19,
       "state_topic":"unipi/buiten/voordeur/temperatuur"
    },
    {
       "circuit":"26729616020000C2",
       "description":"Temperatuur Sensor bijkeuken",
       "dev":"temp",
+      "interval":19,
       "state_topic":"unipi/bbg/bijkeuken/temperatuur"
    },
    {
       "circuit":"26729616020000C2",
       "description":"Luchtvochtigheid Sensor bijkeuken",
       "dev":"humidity",
+      "interval":19,
       "state_topic":"unipi/bbg/bijkeuken/luchtvochtigheid"
    }
 ]
